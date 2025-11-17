@@ -1,0 +1,76 @@
+name: ModernNoCupboardDecay
+title: Modern No Cupboard Decay
+version: 1.0.0
+author: Gabriel
+game: rust
+modloader: oxide
+branch: stable
+
+description: >
+  Prevents decay for anything within Tool Cupboard radius, including newer deployables and decorations,
+  with wipe-aware timer UI, team-aware authorization, auto-detected wipe modes, localization, and live configuration
+  via chat, console, and RCON.
+
+language: C#
+category: building
+license: MIT
+
+website: https://github.com/gjdunga/ModernNoCupboardDecay
+source: https://github.com/gjdunga/ModernNoCupboardDecay
+documentation: https://github.com/gjdunga/ModernNoCupboardDecay#readme
+
+support:
+donate:
+thumbnail:
+
+tags:
+  - rust
+  - oxide
+  - umod
+  - cupboard
+  - decay
+  - building
+  - wipe
+  - qol
+  - pve
+
+permissions:
+  - name: modernnocupboarddecay.admin
+    description: Allows use of ModernNoCupboardDecay admin commands and configuration changes.
+
+commands:
+  - name: mncd
+    type: chat
+    authlevel: 0
+    description: Shows plugin status and configuration summary.
+    usage: /mncd
+
+  - name: mncd
+    type: console
+    authlevel: 2
+    description: Shows plugin status and configuration summary.
+    usage: mncd
+
+  - name: mncdset
+    type: chat
+    authlevel: 2
+    description: Changes ModernNoCupboardDecay configuration values at runtime.
+    usage: /mncdset <option> <value>
+
+  - name: mncd.set
+    type: console
+    authlevel: 2
+    description: Changes ModernNoCupboardDecay configuration values at runtime.
+    usage: mncd.set <option> <value>
+
+  - name: mncdui
+    type: chat
+    authlevel: 2
+    description: Adjusts the wipe-timer UI panel anchors.
+    usage: /mncdui <minX> <minY> <maxX> <maxY>
+
+  - name: mncd.ui
+    type: console
+    authlevel: 2
+    description: Adjusts the wipe-timer UI panel anchors.
+    usage: mncd.ui <minX> <minY> <maxX> <maxY>

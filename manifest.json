@@ -1,0 +1,81 @@
+{
+  "name": "ModernNoCupboardDecay",
+  "title": "Modern No Cupboard Decay",
+  "version": "1.0.0",
+  "author": "Gabriel",
+  "description": "Prevents decay for anything within Tool Cupboard radius, with wipe-aware timer UI, team-aware auth, live config commands, and localization.",
+  "language": "C#",
+  "game": "rust",
+  "modloader": "oxide",
+  "branch": "stable",
+  "references": [],
+  "requirements": [],
+  "category": "building",
+  "tags": [
+    "rust",
+    "oxide",
+    "umod",
+    "cupboard",
+    "decay",
+    "building",
+    "pve",
+    "qol"
+  ],
+  "license": "MIT",
+  "website": "https://github.com/gjdunga/ModernNoCupboardDecay",
+  "source": "https://github.com/gjdunga/ModernNoCupboardDecay",
+  "documentation": "https://github.com/gjdunga/ModernNoCupboardDecay#readme",
+  "thumbnail": "",
+  "support": "",
+  "donate": "",
+  "commands": [
+    {
+      "name": "mncd",
+      "type": "chat",
+      "authlevel": 0,
+      "description": "Shows plugin status and configuration summary.",
+      "usage": "/mncd"
+    },
+    {
+      "name": "mncd",
+      "type": "console",
+      "authlevel": 2,
+      "description": "Shows plugin status and configuration summary.",
+      "usage": "mncd"
+    },
+    {
+      "name": "mncdset",
+      "type": "chat",
+      "authlevel": 2,
+      "description": "Changes ModernNoCupboardDecay configuration values at runtime.",
+      "usage": "/mncdset <option> <value>"
+    },
+    {
+      "name": "mncd.set",
+      "type": "console",
+      "authlevel": 2,
+      "description": "Changes ModernNoCupboardDecay configuration values at runtime.",
+      "usage": "mncd.set <option> <value>"
+    },
+    {
+      "name": "mncdui",
+      "type": "chat",
+      "authlevel": 2,
+      "description": "Adjusts the wipe-timer UI panel anchors.",
+      "usage": "/mncdui <minX> <minY> <maxX> <maxY>"
+    },
+    {
+      "name": "mncd.ui",
+      "type": "console",
+      "authlevel": 2,
+      "description": "Adjusts the wipe-timer UI panel anchors.",
+      "usage": "mncd.ui <minX> <minY> <maxX> <maxY>"
+    }
+  ],
+  "permissions": [
+    {
+      "name": "modernnocupboarddecay.admin",
+      "description": "Allows access to all ModernNoCupboardDecay admin commands and configuration."
+    }
+  ]
+}

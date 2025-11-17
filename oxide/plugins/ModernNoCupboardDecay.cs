@@ -8,7 +8,7 @@ using Oxide.Game.Rust.Cui;
 
 namespace Oxide.Plugins
 {
-    [Info("ModernNoCupboardDecay", "Gabriel", "3.6.0")]
+    [Info("ModernNoCupboardDecay", "gjdunga", "3.6.0")]
     [Description("Prevents decay for anything within a Tool Cupboard radius, with wipe-aware timer UI, team-aware auth, live config commands, and localization.")]
     public class ModernNoCupboardDecay : RustPlugin
     {

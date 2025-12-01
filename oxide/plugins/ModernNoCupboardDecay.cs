@@ -8,7 +8,7 @@ using Oxide.Game.Rust.Cui;
 
 namespace Oxide.Plugins
 {
-    [Info("ModernNoCupboardDecay", "gjdunga", "3.6.0")]
+    [Info("ModernNoCupboardDecay", "Gabriel", "1.0.1")]
     [Description("Prevents decay for anything within a Tool Cupboard radius, with wipe-aware timer UI, team-aware auth, live config commands, and localization.")]
     public class ModernNoCupboardDecay : RustPlugin
     {
@@ -434,6 +434,7 @@ namespace Oxide.Plugins
             if (colliders == null || colliders.Length == 0)
                 return false;
 
+            // If we're not checking TC auth at all: any TC in radius => no decay
             if (!configData.CheckAuth)
             {
                 foreach (var col in colliders)
@@ -446,6 +447,7 @@ namespace Oxide.Plugins
                 return false;
             }
 
+            // Auth-aware mode: require that the entity owner is authed or a teammate
             ulong ownerId = GetOwnerId(entity as BaseCombatEntity, info);
             if (ownerId == 0)
                 return false;
@@ -463,11 +465,17 @@ namespace Oxide.Plugins
             return false;
         }
 
+        /// <summary>
+        /// Returns true if the given ownerId is either directly authorized on the cupboard
+        /// OR (if TeamAwareProtection is enabled) on the same Rust team as the cupboard owner
+        /// or any authorized player on that cupboard.
+        /// </summary>
         private bool IsOwnerAuthorizedOrTeammate(BuildingPrivlidge priv, ulong ownerId)
         {
             if (priv == null || ownerId == 0)
                 return false;
 
+            // Direct TC auth first
             if (CupboardAuthCheck(priv, ownerId))
                 return true;
 
@@ -482,15 +490,17 @@ namespace Oxide.Plugins
             if (ownerTeam == null)
                 return false;
 
+            // If cupboard owner is in the same team
             if (ownerTeam.members.Contains(priv.OwnerID))
                 return true;
 
+            // If any authorized player (stored as ulong on this build) is in the same team
             var authList = priv.authorizedPlayers;
             if (authList != null)
             {
-                foreach (var auth in authList)
+                foreach (var authUserId in authList)
                 {
-                    if (ownerTeam.members.Contains(auth.userid))
+                    if (ownerTeam.members.Contains(authUserId))
                         return true;
                 }
             }
@@ -498,6 +508,10 @@ namespace Oxide.Plugins
             return false;
         }
 
+        /// <summary>
+        /// Returns true if the given SteamID is authorized on the provided cupboard.
+        /// Assumes authorizedPlayers is List<ulong> on this Rust build.
+        /// </summary>
         private bool CupboardAuthCheck(BuildingPrivlidge priv, ulong ownerId)
         {
             if (priv == null || ownerId == 0)
@@ -507,9 +521,9 @@ namespace Oxide.Plugins
             if (authList == null || authList.Count == 0)
                 return false;
 
-            foreach (var auth in authList)
+            foreach (var authUserId in authList)
             {
-                if (auth.userid == ownerId)
+                if (authUserId == ownerId)
                     return true;
             }
 

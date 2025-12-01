@@ -2,7 +2,7 @@ README.md
 # ModernNoCupboardDecay
 
 **Author:** Gabriel  
-**Version:** 3.6.0
+**Version:** 3.7.0
 **Game:** Rust (uMod / Oxide plugin)
 
 ModernNoCupboardDecay disables **decay** for **any entity** inside the radius of a **Tool Cupboard**, including newer decorative items (e.g., wallpaper, deployables, etc.).  

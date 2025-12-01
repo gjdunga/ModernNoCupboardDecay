@@ -1,7 +1,7 @@
 {
   "name": "ModernNoCupboardDecay",
   "title": "Modern No Cupboard Decay",
-  "version": "1.0.0",
+  "version": "3.7.0",
   "author": "Gabriel",
   "description": "Prevents decay for anything within Tool Cupboard radius, with wipe-aware timer UI, team-aware auth, live config commands, and localization.",
   "language": "C#",

@@ -1,0 +1,70 @@
+{
+  "Status.Report": "[{0}] v{1} | Состояние: {2} | Радиус: {3} | CheckAuth: {4} | TeamAware: {5} | AutoDetect: {6} | WipeMode: {7} (Override: {8}) | Время до вайпа: {9} | Статус: {10}",
+
+  "Error.NoPermission": "[MNCD] У вас нет прав изменять настройки.",
+  "Error.NoDebugPermission": "[MNCD] У вас нет прав использовать отладочный оверлей.",
+  "Error.ConfigOption": "[MNCD] Неизвестный параметр. Допустимые: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow.",
+  "Error.ConfigApply": "[MNCD] Ошибка применения '{0}': {1}",
+  "Error.CheckAuthValue": "[MNCD] checkauth должен быть true/false.",
+  "Error.TeamAwareValue": "[MNCD] teamaware должен быть true/false.",
+  "Error.AutoDetectValue": "[MNCD] autodetect должен быть true/false.",
+  "Error.RadiusValue": "[MNCD] radius должен быть положительным числом (метры).",
+  "Error.WipeModeValue": "[MNCD] wipemode должен быть: Manual, Weekly, BiWeekly, Monthly или количество дней, например 5d.",
+  "Error.BoolExpected": "[MNCD] {0} должен быть true/false.",
+
+  "Usage.MncdSet.Chat": "[MNCD] Использование: /mncdset <опция> <значение>. Опции: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow.",
+  "Usage.MncdSet.Console": "[MNCD] Использование: mncd.set <опция> <значение>. Опции: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow.",
+  "Usage.UIAdd.Chat": "[MNCD] Использование: /mncduiadd <deltaX> <deltaY> (смещения 0..1).",
+  "Usage.UIAdd.Console": "[MNCD] Использование: mncd.uiadd <deltaX> <deltaY> (смещения 0..1).",
+  "Usage.UIReset.Chat": "[MNCD] Использование: /mncdresetui (сброс позиции панели UI по умолчанию).",
+  "Usage.UIReset.Console": "[MNCD] Использование: mncd.resetui (сброс позиции панели UI по умолчанию).",
+
+  "Config.CheckAuth.Set": "[MNCD] CheckAuth теперь {0}.",
+  "Config.TeamAware.Set": "[MNCD] TeamAwareProtection теперь {0}.",
+  "Config.Radius.Set": "[MNCD] EntityRadius (зона защиты от гниения у TC) теперь {0} м.",
+  "Config.AutoDetect.Set": "[MNCD] AutoDetectWipeFromTags теперь {0}. Активный WipeMode: {1}.",
+  "Config.WipeMode.Set": "[MNCD] WipeModeOverride установлен в '{0}'. Активный WipeMode: {1}, AutoDetect отключен.",
+  "Config.WipeStartNow.Set": "[MNCD] WipeStartUnixTime установлен на текущее время. WipeMode: {0}. До конца вайпа: {1}.",
+  "Config.UIReset.Set": "[MNCD] Анкоры UI сброшены по умолчанию. Откройте шкаф (TC) снова, чтобы увидеть новую позицию.",
+  "Config.UIAdd.Set": "[MNCD] Анкоры UI сдвинуты на Δ({0}, {1}). Новый Min({2}, {3}) Max({4}, {5}).",
+
+  "TcLoot.NoRemaining": "[MNCD] Радиус этого TC полностью защищён от гниения плагином ModernNoCupboardDecay.\nРасписание вайпа: {0}. Окончание вайпа не рассчитано (ручной режим или нет данных).",
+  "TcLoot.WithRemaining": "[MNCD] Радиус этого TC полностью защищён от гниения плагином ModernNoCupboardDecay.\nРасписание вайпа: {0}. Вайп через: {1}.",
+
+  "UI.WipeTitle": "ModernNoCupboardDecay",
+  "UI.WipeLine": "Вайп: {0} – осталось {1}",
+  "UI.WipeExtra": "Гниение отключено внутри радиуса этого шкафа с инструментами (TC).",
+
+  "UIAnchor.Usage.Chat": "[MNCD] Использование: /mncdui <minX> <minY> <maxX> <maxY>",
+  "UIAnchor.Usage.Console": "[MNCD] Использование: mncd.ui <minX> <minY> <maxX> <maxY>",
+  "UIAnchor.Set": "[MNCD] Анкоры UI: Min({0}, {1})  Max({2}, {3})",
+  "UIAnchor.Error.Numeric": "[MNCD] Все 4 значения должны быть числовыми.",
+  "UIAnchor.Error.Order": "[MNCD] Необходимо, чтобы minX < maxX и minY < maxY.",
+
+  "Debug.Enabled": "[MNCD] Отладочный оверлей включён. Он показывает, находитесь ли вы в зоне защиты MNCD.",
+  "Debug.Disabled": "[MNCD] Отладочный оверлей выключен.",
+  "Debug.UI.Protected": "MNCD: Защищено",
+  "Debug.UI.NotProtected": "MNCD: Не защищено",
+
+  "Preview.NoTC": "[MNCD] Рядом не найдено шкафов с инструментами (TC). Нечего показывать.",
+  "Preview.Drawn": "[MNCD] Рисую кольца защиты TC для {0} шкафов на {1} сек. (радиус {2} м).",
+  "Preview.NoPerm": "[MNCD] У вас нет прав использовать /mncdpreview.",
+
+  "Help.Header": "[MNCD] ModernNoCupboardDecay v{0}",
+
+  "Help.General": "ModernNoCupboardDecay отключает гниение сущностей внутри радиуса шкафа с инструментами (TC) и показывает информацию о вайпе.\nОсновные команды:\n  /mncd               - Показать состояние плагина.\n  /mncdhelp [тема]    - Показать помощь. Темы: basic, ui, set, debug, preview, wipe.\n  /mncdpreview        - Показать кольца защиты TC (голограмма).\n  /mncddebug          - Включить/выключить личный отладочный индикатор защиты.\nКоманды администратора:\n  /mncdset            - Живая настройка (радиус, авторизация, режим вайпа).\n  /mncdui, /mncduiadd - Перемещение панели UI вайпа.\n  /mncdresetui        - Сброс позиции панели UI.\nИспользуйте '/mncdhelp <тема>' для подробностей. Пример: /mncdhelp preview",
+
+  "Help.UnknownTopic": "[MNCD] Неизвестная тема помощи '{0}'. Допустимые: basic, ui, set, debug, preview, wipe.",
+
+  "Help.Topic.basic": "Основы MNCD:\n• Все сущности внутри заданного радиуса от TC защищены от гниения.\n• Необязательный CheckAuth: защищаются только сущности, принадлежащие игроку, авторизованному в TC (или его команде).\n• TeamAwareProtection: если включён, защищаются тиммейты владельца TC и авторизованные игроки.\n• Время содержания TC превращается в 'время до вайпа' в UI MNCD.\nПолезные команды:\n  /mncd           - Показать текущий радиус, режим вайпа и статус.\n  /mncddebug      - Проверить, находитесь ли вы в защищённой зоне.",
+
+  "Help.Topic.ui": "Позиционирование UI:\n  /mncdui <minX> <minY> <maxX> <maxY>\n    • Устанавливает анкоры панели UI вайпа (нормализованные координаты 0..1).\n    • Пример: /mncdui 0.70 0.27 0.95 0.49\n  /mncduiadd <dx> <dy>\n    • Сдвигает панель UI на небольшое расстояние.\n    • Пример: /mncduiadd -0.02 0.10 — на 2% влево и 10% вверх.\n  /mncdresetui\n    • Сбрасывает UI в стандартную позицию сверху по центру.\nЗаметки:\n  • Требуются права администратора или разрешение 'modernnocupboarddecay.admin'.\n  • После изменения UI откройте TC заново, чтобы увидеть обновлённую панель.",
+
+  "Help.Topic.set": "Живая настройка: /mncdset и mncd.set\n\nЧат (админ):\n  /mncdset <опция> <значение>\nКонсоль/RCON:\n  mncd.set <опция> <значение>\n\nОпции:\n  checkauth <true|false>\n    • true  => защищаются только сущности игроков, авторизованных в TC (и, при необходимости, их команды).\n    • false => защищается всё рядом с TC.\n  teamaware <true|false>\n    • При checkauth = true дополнительно защищаются тиммейты владельца/авторизованных игроков.\n  radius <метры>\n    • Задаёт радиус защиты TC. Пример: /mncdset radius 30\n  autodetect <true|false>\n    • true  => определять режим вайпа по server.tags (weekly, monthly, 5d и т.п.).\n    • false => использовать WipeModeOverride.\n  wipemode <Manual|Weekly|BiWeekly|Monthly|Nd>\n    • Пример: /mncdset wipemode 5d (вайп каждые 5 дней).\n  wipestartnow\n    • Сбросить начало вайпа на текущее время. Полезно при смене расписания в середине вайпа.\n",
+
+  "Help.Topic.debug": "Отладочный оверлей: /mncddebug и mncd.debug\n\n  /mncddebug\n    • Включает/выключает небольшой текстовый индикатор сверху:\n      'MNCD: Защищено'     => вы внутри радиуса защиты TC.\n      'MNCD: Не защищено' => вы вне зоны защиты MNCD.\n  mncd.debug (консоль)\n    • То же самое, но из консоли F1 для этого игрока.\n\nЗаметки:\n  • Требуются права администратора или разрешение 'modernnocupboarddecay.debug'.\n  • Обновляется каждые 0,5 секунды.\n  • Автоматически отключается и очищается при выходе игрока.",
+
+  "Help.Topic.preview": "Предпросмотр зоны TC: /mncdpreview и mncd.preview\n\n  /mncdpreview\n    • Рисует 'голографические' сферы вокруг всех шкафов с инструментами.\n    • Использует настроенный EntityRadius (можно умножить через PreviewRingRadiusMultiplier).\n    • Кольца видите только вы; это клиентский ddraw.\n\n  mncd.preview (консоль)\n    • То же самое, но из консоли F1.\n\nНастройки:\n  PreviewRequiresPermission\n    • false (по умолчанию) => любой игрок может использовать /mncdpreview.\n    • true                 => требуется разрешение 'modernnocupboarddecay.preview' или админ.\n  PreviewRingDuration\n    • Время отображения колец (секунды).\n  PreviewRingRadiusMultiplier\n    • Множитель радиуса EntityRadius только для визуального кольца.\n",
+
+  "Help.Topic.wipe": "Режимы вайпа и таймер вайпа:\n\nОпределение:\n  • AutoDetectWipeFromTags = true:\n    - Читает ConVar.Server.tags, ища: weekly, biweekly, monthly.\n    - Поддерживает шаблоны вида '5d', '5day', '5days' для вайпов каждые N дней.\n  • AutoDetectWipeFromTags = false:\n    - Использует WipeModeOverride из конфига или /mncdset wipemode.\n\nПоддерживаемые режимы:\n  Manual      => нет автоматического окончания вайпа.\n  Weekly      => вайп раз в 7 дней.\n  BiWeekly    => раз в 14 дней.\n  Monthly     => раз в 30 дней (фиксированно).\n  Nd (Custom) => например '5d' => раз в 5 дней.\n\nНачало вайпа:\n  • OnNewSave (новая карта/вайп) автоматически устанавливает WipeStartUnixTime.\n  • /mncdset wipestartnow позволяет вручную пересбросить начало вайпа.\n\nUI TC:\n  • При открытии TC MNCD показывает 'Wipe: <режим> – <оставшееся время>'.\n  • Если режим Manual или время не посчитать, отображается N/A."
+}

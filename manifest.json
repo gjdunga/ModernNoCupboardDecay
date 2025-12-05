@@ -1,81 +1,29 @@
 {
   "name": "ModernNoCupboardDecay",
   "title": "Modern No Cupboard Decay",
-  "version": "3.7.0",
+  "version": "4.0.0",
   "author": "Gabriel",
-  "description": "Prevents decay for anything within Tool Cupboard radius, with wipe-aware timer UI, team-aware auth, live config commands, and localization.",
+  "description": "A modern full-featured Rust plugin that disables decay within Tool Cupboard radius, supports team-aware authorization, wipe-aware UI, draggable UI positioning, debug overlays, TC preview holograms, automatic wipe detection, and multilingual support.",
   "language": "C#",
   "game": "rust",
   "modloader": "oxide",
   "branch": "stable",
-  "references": [],
-  "requirements": [],
   "category": "building",
+  "license": "MIT",
+  "website": "https://github.com/gjdunga/ModernNoCupboardDecay",
+  "source": "https://github.com/gjdunga/ModernNoCupboardDecay",
+  "documentation": "https://github.com/gjdunga/ModernNoCupboardDecay#readme",
   "tags": [
     "rust",
     "oxide",
     "umod",
     "cupboard",
     "decay",
-    "building",
-    "pve",
+    "team",
+    "debug",
+    "wipe",
+    "hologram",
+    "ui",
     "qol"
-  ],
-  "license": "MIT",
-  "website": "https://github.com/gjdunga/ModernNoCupboardDecay",
-  "source": "https://github.com/gjdunga/ModernNoCupboardDecay",
-  "documentation": "https://github.com/gjdunga/ModernNoCupboardDecay#readme",
-  "thumbnail": "",
-  "support": "",
-  "donate": "",
-  "commands": [
-    {
-      "name": "mncd",
-      "type": "chat",
-      "authlevel": 0,
-      "description": "Shows plugin status and configuration summary.",
-      "usage": "/mncd"
-    },
-    {
-      "name": "mncd",
-      "type": "console",
-      "authlevel": 2,
-      "description": "Shows plugin status and configuration summary.",
-      "usage": "mncd"
-    },
-    {
-      "name": "mncdset",
-      "type": "chat",
-      "authlevel": 2,
-      "description": "Changes ModernNoCupboardDecay configuration values at runtime.",
-      "usage": "/mncdset <option> <value>"
-    },
-    {
-      "name": "mncd.set",
-      "type": "console",
-      "authlevel": 2,
-      "description": "Changes ModernNoCupboardDecay configuration values at runtime.",
-      "usage": "mncd.set <option> <value>"
-    },
-    {
-      "name": "mncdui",
-      "type": "chat",
-      "authlevel": 2,
-      "description": "Adjusts the wipe-timer UI panel anchors.",
-      "usage": "/mncdui <minX> <minY> <maxX> <maxY>"
-    },
-    {
-      "name": "mncd.ui",
-      "type": "console",
-      "authlevel": 2,
-      "description": "Adjusts the wipe-timer UI panel anchors.",
-      "usage": "mncd.ui <minX> <minY> <maxX> <maxY>"
-    }
-  ],
-  "permissions": [
-    {
-      "name": "modernnocupboarddecay.admin",
-      "description": "Allows access to all ModernNoCupboardDecay admin commands and configuration."
-    }
   ]
 }

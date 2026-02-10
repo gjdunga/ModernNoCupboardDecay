@@ -1,86 +1,44 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;                    // For LINQ (used in preview)
 using Oxide.Core;
 using Oxide.Core.Libraries.Covalence;
-using Rust;
-using UnityEngine;
 using Oxide.Game.Rust.Cui;
+using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    /// <summary>
-    /// ModernNoCupboardDecay
-    /// 
-    /// High-level responsibilities:
-    /// - Disable decay damage for entities inside a Tool Cupboard radius.
-    /// - Optionally require TC auth + team membership for protection.
-    /// - Track wipe start time and compute "time until wipe end".
-    /// - Display a TC UI panel showing wipe mode + time remaining.
-    /// - Provide commands for live configuration + UI positioning.
-    /// - Provide debug tools: protection overlay, TC preview rings.
-    /// </summary>
-    [Info("ModernNoCupboardDecay", "Gabriel", "4.0.0")]
-    [Description("Prevents decay for anything within a Tool Cupboard radius, with wipe-aware timer UI, team-aware auth, debug tools, and localization.")]
+    [Info("ModernNoCupboardDecay", "Gabriel", "5.0.0")]
+    [Description("Prevents decay within Tool Cupboard radius. Wipe-aware UI, team auth, debug tools. Oxide 2.0.7022+ / Naval Update compatible.")]
     public class ModernNoCupboardDecay : RustPlugin
     {
-        // -----------------------
-        //  Config & Diagnostics
-        // -----------------------
+        #region Fields
 
-        private ConfigData configData;
+        private ConfigData _config;
+        private bool _initialized;
+        private string _statusMsg = "Plugin not yet initialized.";
+        private WipeMode _wipeMode = WipeMode.Manual;
+        private int _protectionMask;
 
-        /// <summary>
-        /// True when plugin finished Init + OnServerInitialized successfully.
-        /// Used mostly for status display.
-        /// </summary>
-        private bool pluginInitialized;
+        private const string PermAdmin = "modernnocupboarddecay.admin";
+        private const string PermDebug = "modernnocupboarddecay.debug";
+        private const string PermPreview = "modernnocupboarddecay.preview";
 
-        /// <summary>
-        /// Human-readable last status / error message, used in /mncd output.
-        /// </summary>
-        private string lastStatusMessage = "Plugin not yet initialized.";
+        private const string UiWipe = "MNCD_WipeTimer";
+        private const string UiDebug = "MNCD_DebugOverlay";
 
-        /// <summary>
-        /// Internal enumeration of wipe modes.
-        /// "CustomDays" is for arbitrary N-day wipes (e.g., 5d, 10d).
-        /// </summary>
-        private enum WipeMode
-        {
-            Manual = 0,
-            Weekly = 1,
-            BiWeekly = 2,
-            Monthly = 3,
-            CustomDays = 4
-        }
+        // Pre-allocated buffer for Physics.OverlapSphereNonAlloc — zero GC in hot path
+        private static readonly Collider[] HitBuffer = new Collider[512];
 
-        private WipeMode currentWipeMode = WipeMode.Manual;
+        private readonly HashSet<ulong> _debugUsers = new HashSet<ulong>();
+        private readonly Dictionary<ulong, Timer> _debugTimers = new Dictionary<ulong, Timer>();
 
-        // Permissions
-        private const string permAdmin   = "modernnocupboarddecay.admin";
-        private const string permDebug   = "modernnocupboarddecay.debug";
-        private const string permPreview = "modernnocupboarddecay.preview";
+        private enum WipeMode { Manual, Weekly, BiWeekly, Monthly, CustomDays }
 
-        // CUI element names
-        private const string WipeUiName  = "MNCD_WipeTimer";
-        private const string DebugUiName = "MNCD_DebugOverlay";
-
-        /// <summary>
-        /// Players who currently have the debug overlay enabled.
-        /// </summary>
-        private readonly HashSet<ulong> debugOverlayUsers = new HashSet<ulong>();
-
-        /// <summary>
-        /// Timers driving the debug overlay for each player (periodic update).
-        /// </summary>
-        private readonly Dictionary<ulong, Timer> debugOverlayTimers = new Dictionary<ulong, Timer>();
+        #endregion
 
         #region Config
 
-        /// <summary>
-        /// Strongly-typed plugin config. Serialized to oxide/config/ModernNoCupboardDecay.json.
-        /// </summary>
         private class ConfigData
         {
             public bool CheckAuth { get; set; } = false;
@@ -106,33 +64,37 @@ namespace Oxide.Plugins
         protected override void LoadDefaultConfig()
         {
             PrintWarning("Creating new configuration with default values.");
-            configData = new ConfigData();
+            _config = new ConfigData();
         }
 
-        private void LoadVariables()
+        private void LoadConfigData()
         {
             try
             {
-                configData = Config.ReadObject<ConfigData>();
-                if (configData == null)
-                    throw new Exception("Config file contained null, using defaults.");
-
-                lastStatusMessage = "Configuration loaded successfully.";
+                _config = Config.ReadObject<ConfigData>();
+                if (_config == null)
+                    throw new Exception("Config deserialized to null.");
             }
             catch (Exception e)
             {
-                lastStatusMessage = $"Config load error, using defaults: {e.Message}";
-                PrintWarning(lastStatusMessage);
+                PrintWarning($"Config load error, using defaults: {e.Message}");
                 LoadDefaultConfig();
             }
 
-            SaveConfig(configData);
+            ValidateConfig();
+            SaveConfig(_config);
+            _statusMsg = "Configuration loaded.";
         }
 
-        private void SaveConfig(ConfigData config)
+        private void ValidateConfig()
         {
-            Config.WriteObject(config, true);
+            _config.EntityRadius = Mathf.Clamp(_config.EntityRadius, 1f, 500f);
+            _config.CustomWipeDays = Mathf.Clamp(_config.CustomWipeDays, 0, 365);
+            _config.PreviewRingDuration = Mathf.Clamp(_config.PreviewRingDuration, 1f, 300f);
+            _config.PreviewRingRadiusMultiplier = Mathf.Clamp(_config.PreviewRingRadiusMultiplier, 0.1f, 10f);
         }
+
+        private void SaveConfig(ConfigData cfg) => Config.WriteObject(cfg, true);
 
         #endregion
 
@@ -142,10 +104,8 @@ namespace Oxide.Plugins
         {
             lang.RegisterMessages(new Dictionary<string, string>
             {
-                // General / status
                 ["Status.Report"] = "[{0}] v{1} | State: {2} | Radius: {3} | CheckAuth: {4} | TeamAware: {5} | AutoDetect: {6} | WipeMode: {7} (Override: {8}) | WipeRemaining: {9} | Status: {10}",
 
-                // Permissions / errors
                 ["Error.NoPermission"] = "[MNCD] You do not have permission to change settings.",
                 ["Error.NoDebugPermission"] = "[MNCD] You do not have permission to use the debug overlay.",
                 ["Error.ConfigOption"] = "[MNCD] Unknown option. Valid options: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow.",
@@ -157,7 +117,6 @@ namespace Oxide.Plugins
                 ["Error.WipeModeValue"] = "[MNCD] wipemode requires one of: Manual, Weekly, BiWeekly, Monthly, or a numeric day count like 5d.",
                 ["Error.BoolExpected"] = "[MNCD] {0} requires true/false.",
 
-                // Usage
                 ["Usage.MncdSet.Chat"] = "[MNCD] Usage: /mncdset <option> <value>. Options: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow.",
                 ["Usage.MncdSet.Console"] = "[MNCD] Usage: mncd.set <option> <value>. Options: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow.",
                 ["Usage.UIAdd.Chat"] = "[MNCD] Usage: /mncduiadd <deltaX> <deltaY> (normalized 0..1 offsets).",
@@ -165,7 +124,6 @@ namespace Oxide.Plugins
                 ["Usage.UIReset.Chat"] = "[MNCD] Usage: /mncdresetui (resets to plugin default UI position).",
                 ["Usage.UIReset.Console"] = "[MNCD] Usage: mncd.resetui (resets to plugin default UI position).",
 
-                // Config changes
                 ["Config.CheckAuth.Set"] = "[MNCD] CheckAuth is now {0}.",
                 ["Config.TeamAware.Set"] = "[MNCD] TeamAwareProtection is now {0}.",
                 ["Config.Radius.Set"] = "[MNCD] EntityRadius (TC decay bubble) is now {0} meters.",
@@ -173,36 +131,30 @@ namespace Oxide.Plugins
                 ["Config.WipeMode.Set"] = "[MNCD] WipeModeOverride set to '{0}'. Active WipeMode is now {1}, AutoDetect disabled.",
                 ["Config.WipeStartNow.Set"] = "[MNCD] WipeStartUnixTime set to now. WipeMode: {0}. WipeRemaining: {1}.",
                 ["Config.UIReset.Set"] = "[MNCD] UI anchors reset to default. Reopen a Tool Cupboard to see the new position.",
-                ["Config.UIAdd.Set"] = "[MNCD] UI anchors shifted by Δ({0}, {1}). New Min({2}, {3}) Max({4}, {5}).",
+                ["Config.UIAdd.Set"] = "[MNCD] UI anchors shifted by ({0}, {1}). New Min({2}, {3}) Max({4}, {5}).",
 
-                // TC loot messages (fallback if UI disabled)
-                ["TcLoot.NoRemaining"] = "[MNCD] This TC's radius is fully protected from decay by ModernNoCupboardDecay.\nWipe schedule: {0}. Wipe end not calculated (manual or missing data).",
-                ["TcLoot.WithRemaining"] = "[MNCD] This TC's radius is fully protected from decay by ModernNoCupboardDecay.\nWipe schedule: {0}. Wipe ends in: {1}.",
+                ["TcLoot.NoRemaining"] = "[MNCD] This TC's radius is fully protected from decay.\nWipe schedule: {0}. Wipe end not calculated (manual or missing data).",
+                ["TcLoot.WithRemaining"] = "[MNCD] This TC's radius is fully protected from decay.\nWipe schedule: {0}. Wipe ends in: {1}.",
 
-                // UI text
                 ["UI.WipeTitle"] = "ModernNoCupboardDecay",
-                ["UI.WipeLine"]  = "Wipe: {0} – {1} remaining",
+                ["UI.WipeLine"] = "Wipe: {0} \u2013 {1} remaining",
                 ["UI.WipeExtra"] = "Decay disabled within this Tool Cupboard radius.",
 
-                // UI anchor / layout commands
                 ["UIAnchor.Usage.Chat"] = "[MNCD] Usage: /mncdui <minX> <minY> <maxX> <maxY>",
                 ["UIAnchor.Usage.Console"] = "[MNCD] Usage: mncd.ui <minX> <minY> <maxX> <maxY>",
                 ["UIAnchor.Set"] = "[MNCD] UI Anchor set: Min({0}, {1})  Max({2}, {3})",
                 ["UIAnchor.Error.Numeric"] = "[MNCD] All 4 values must be numeric.",
                 ["UIAnchor.Error.Order"] = "[MNCD] minX < maxX and minY < maxY is required.",
 
-                // Debug overlay
-                ["Debug.Enabled"]  = "[MNCD] Debug overlay enabled. It will show whether YOU are currently inside a MNCD protection zone.",
+                ["Debug.Enabled"] = "[MNCD] Debug overlay enabled. Shows whether you are inside a protection zone.",
                 ["Debug.Disabled"] = "[MNCD] Debug overlay disabled.",
-                ["Debug.UI.Protected"]    = "MNCD: Protected",
+                ["Debug.UI.Protected"] = "MNCD: Protected",
                 ["Debug.UI.NotProtected"] = "MNCD: Not Protected",
 
-                // Preview
-                ["Preview.NoTC"] = "[MNCD] No Tool Cupboards found nearby. Nothing to preview.",
+                ["Preview.NoTC"] = "[MNCD] No Tool Cupboards found. Nothing to preview.",
                 ["Preview.Drawn"] = "[MNCD] Drawing TC protection rings for {0} cupboards for {1} seconds (radius {2}m).",
                 ["Preview.NoPerm"] = "[MNCD] You do not have permission to use /mncdpreview.",
 
-                // Help system
                 ["Help.Header"] = "[MNCD] ModernNoCupboardDecay v{0}",
                 ["Help.General"] =
                     "ModernNoCupboardDecay prevents decay for entities within Tool Cupboard radius and shows wipe info.\n" +
@@ -221,10 +173,10 @@ namespace Oxide.Plugins
 
                 ["Help.Topic.basic"] =
                     "MNCD basics:\n" +
-                    "• All entities within the configured radius of a Tool Cupboard are protected from decay.\n" +
-                    "• Optional CheckAuth: only entities owned by a TC authed player (or their team) are protected.\n" +
-                    "• TeamAwareProtection: when enabled, TC owner's Rust team and authed teammates are also covered.\n" +
-                    "• The TC upkeep 'time left' becomes 'time until wipe' in the MNCD UI.\n" +
+                    "  All entities within the configured radius of a Tool Cupboard are protected from decay.\n" +
+                    "  Optional CheckAuth: only entities owned by a TC authed player (or their team) are protected.\n" +
+                    "  TeamAwareProtection: when enabled, TC owner's Rust team and authed teammates are also covered.\n" +
+                    "  The TC upkeep 'time left' becomes 'time until wipe' in the MNCD UI.\n" +
                     "Useful commands:\n" +
                     "  /mncd           - Show current radius, wipe mode, and status.\n" +
                     "  /mncddebug      - See if you are currently inside a protected bubble.",
@@ -232,16 +184,16 @@ namespace Oxide.Plugins
                 ["Help.Topic.ui"] =
                     "UI positioning:\n" +
                     "  /mncdui <minX> <minY> <maxX> <maxY>\n" +
-                    "    • Sets the TC wipe UI panel anchors in normalized screen coords (0..1).\n" +
-                    "    • Example: /mncdui 0.70 0.27 0.95 0.49\n" +
+                    "    Sets the TC wipe UI panel anchors in normalized screen coords (0..1).\n" +
+                    "    Example: /mncdui 0.70 0.27 0.95 0.49\n" +
                     "  /mncduiadd <dx> <dy>\n" +
-                    "    • Nudges the UI panel by a small offset.\n" +
-                    "    • Example: /mncduiadd -0.02 0.10 moves it 2% left, 10% up.\n" +
+                    "    Nudges the UI panel by a small offset.\n" +
+                    "    Example: /mncduiadd -0.02 0.10 moves it 2% left, 10% up.\n" +
                     "  /mncdresetui\n" +
-                    "    • Resets the UI to the default top-center position.\n" +
+                    "    Resets the UI to the default top-center position.\n" +
                     "Notes:\n" +
-                    "  • Requires admin or 'modernnocupboarddecay.admin' permission.\n" +
-                    "  • After changing UI, reopen the TC to refresh the panel.",
+                    "  Requires admin or 'modernnocupboarddecay.admin' permission.\n" +
+                    "  After changing UI, reopen the TC to refresh the panel.",
 
                 ["Help.Topic.set"] =
                     "Live configuration: /mncdset and mncd.set\n\n" +
@@ -251,58 +203,58 @@ namespace Oxide.Plugins
                     "  mncd.set <option> <value>\n\n" +
                     "Options:\n" +
                     "  checkauth <true|false>\n" +
-                    "    • true  => only entities owned by TC-authed players (and optional teams) are protected.\n" +
-                    "    • false => anything near a TC is protected.\n" +
+                    "    true  => only entities owned by TC-authed players (and optional teams) are protected.\n" +
+                    "    false => anything near a TC is protected.\n" +
                     "  teamaware <true|false>\n" +
-                    "    • When checkauth is true, also protect Rust teammates of TC owner/authed.\n" +
+                    "    When checkauth is true, also protect Rust teammates of TC owner/authed.\n" +
                     "  radius <meters>\n" +
-                    "    • Sets TC protection radius. Example: /mncdset radius 30\n" +
+                    "    Sets TC protection radius. Example: /mncdset radius 30\n" +
                     "  autodetect <true|false>\n" +
-                    "    • true  => detect wipe schedule from server.tags (weekly, monthly, 5d, etc.).\n" +
-                    "    • false => use WipeModeOverride.\n" +
+                    "    true  => detect wipe schedule from server.tags (weekly, monthly, 5d, etc.).\n" +
+                    "    false => use WipeModeOverride.\n" +
                     "  wipemode <Manual|Weekly|BiWeekly|Monthly|Nd>\n" +
-                    "    • Example: /mncdset wipemode 5d (for 5-day wipes).\n" +
+                    "    Example: /mncdset wipemode 5d (for 5-day wipes).\n" +
                     "  wipestartnow\n" +
-                    "    • Resets wipe start to now. Use if you change wipe schedule mid-wipe.\n",
+                    "    Resets wipe start to now. Use if you change wipe schedule mid-wipe.\n",
 
                 ["Help.Topic.debug"] =
                     "Debug overlay: /mncddebug and mncd.debug\n\n" +
                     "  /mncddebug\n" +
-                    "    • Toggles a small text panel at the top of your screen:\n" +
+                    "    Toggles a small text panel at the top of your screen:\n" +
                     "      'MNCD: Protected'    => you are inside a protected TC radius.\n" +
                     "      'MNCD: Not Protected' => you are outside MNCD protection.\n" +
                     "  mncd.debug (console)\n" +
-                    "    • Same as /mncddebug, but from the F1 console for that player.\n\n" +
+                    "    Same as /mncddebug, but from the F1 console for that player.\n\n" +
                     "Notes:\n" +
-                    "  • Requires admin or 'modernnocupboarddecay.debug' permission.\n" +
-                    "  • Updates every 0.5 seconds while enabled.\n" +
-                    "  • Automatically stops and cleans up when you disconnect.",
+                    "  Requires admin or 'modernnocupboarddecay.debug' permission.\n" +
+                    "  Updates every 0.5 seconds while enabled.\n" +
+                    "  Automatically stops and cleans up when you disconnect.",
 
                 ["Help.Topic.preview"] =
                     "TC preview rings: /mncdpreview and mncd.preview\n\n" +
                     "  /mncdpreview\n" +
-                    "    • Draws 'hologram' spheres around all Tool Cupboards.\n" +
-                    "    • Uses the configured EntityRadius (optionally multiplied by PreviewRingRadiusMultiplier).\n" +
-                    "    • Only you see the rings; they are client-side ddraw.\n\n" +
+                    "    Draws 'hologram' spheres around all Tool Cupboards.\n" +
+                    "    Uses the configured EntityRadius (optionally multiplied by PreviewRingRadiusMultiplier).\n" +
+                    "    Only you see the rings; they are client-side ddraw.\n\n" +
                     "  mncd.preview (console)\n" +
-                    "    • Same effect, invoked from the F1 console.\n\n" +
+                    "    Same effect, invoked from the F1 console.\n\n" +
                     "Config:\n" +
                     "  PreviewRequiresPermission\n" +
-                    "    • false (default) => everyone can use /mncdpreview.\n" +
-                    "    • true            => requires 'modernnocupboarddecay.preview' perm or admin.\n" +
+                    "    false (default) => everyone can use /mncdpreview.\n" +
+                    "    true            => requires 'modernnocupboarddecay.preview' perm or admin.\n" +
                     "  PreviewRingDuration\n" +
-                    "    • How long rings are visible (seconds).\n" +
+                    "    How long rings are visible (seconds).\n" +
                     "  PreviewRingRadiusMultiplier\n" +
-                    "    • Multiplies EntityRadius for the visual ring only.\n",
+                    "    Multiplies EntityRadius for the visual ring only.\n",
 
                 ["Help.Topic.wipe"] =
                     "Wipe modes and wipe timer:\n\n" +
                     "Detection:\n" +
-                    "  • AutoDetectWipeFromTags = true:\n" +
-                    "    - Reads ConVar.Server.tags for keywords: weekly, biweekly, monthly.\n" +
-                    "    - Also supports patterns like '5d', '5day', '5days' for custom N-day wipes.\n" +
-                    "  • AutoDetectWipeFromTags = false:\n" +
-                    "    - Uses WipeModeOverride from config or /mncdset wipemode.\n\n" +
+                    "  AutoDetectWipeFromTags = true:\n" +
+                    "    Reads ConVar.Server.tags for keywords: weekly, biweekly, monthly.\n" +
+                    "    Also supports patterns like '5d', '5day', '5days' for custom N-day wipes.\n" +
+                    "  AutoDetectWipeFromTags = false:\n" +
+                    "    Uses WipeModeOverride from config or /mncdset wipemode.\n\n" +
                     "Supported modes:\n" +
                     "  Manual      => no automatic wipe end time.\n" +
                     "  Weekly      => 7-day wipes.\n" +
@@ -310,35 +262,43 @@ namespace Oxide.Plugins
                     "  Monthly     => 30-day wipes (fixed length).\n" +
                     "  Nd (Custom) => e.g. '5d' => 5-day wipes.\n\n" +
                     "Wipe start:\n" +
-                    "  • OnNewSave (map/wipe) automatically sets WipeStartUnixTime.\n" +
-                    "  • /mncdset wipestartnow can manually reset the wipe start.\n\n" +
+                    "  OnNewSave (map/wipe) automatically sets WipeStartUnixTime.\n" +
+                    "  /mncdset wipestartnow can manually reset the wipe start.\n\n" +
                     "TC UI:\n" +
-                    "  • When you open a TC, MNCD shows 'Wipe: <mode> – <time remaining>'.\n" +
-                    "  • If mode is Manual or time cannot be computed, it shows N/A instead.",
+                    "  When you open a TC, MNCD shows 'Wipe: <mode> - <time remaining>'.\n" +
+                    "  If mode is Manual or time cannot be computed, it shows N/A instead.",
 
             }, this);
         }
 
         private string Msg(string key, string userId = null, params object[] args)
         {
-            var msg = lang.GetMessage(key, this, userId);
-            return args == null || args.Length == 0 ? msg : string.Format(msg, args);
+            string msg = lang.GetMessage(key, this, userId);
+            if (args == null || args.Length == 0)
+                return msg;
+
+            try
+            {
+                return string.Format(msg, args);
+            }
+            catch (FormatException)
+            {
+                return msg;
+            }
         }
 
         #endregion
 
-        // ----------------
-        //  Plugin Lifecycle
-        // ----------------
+        #region Lifecycle
 
         private void Init()
         {
-            pluginInitialized = false;
-            lastStatusMessage = "Initializing ModernNoCupboardDecay...";
+            _initialized = false;
+            _statusMsg = "Initializing...";
 
-            permission.RegisterPermission(permAdmin, this);
-            permission.RegisterPermission(permDebug, this);
-            permission.RegisterPermission(permPreview, this);
+            permission.RegisterPermission(PermAdmin, this);
+            permission.RegisterPermission(PermDebug, this);
+            permission.RegisterPermission(PermPreview, this);
 
             LoadDefaultMessages();
         }
@@ -347,53 +307,71 @@ namespace Oxide.Plugins
         {
             try
             {
-                LoadVariables();
+                _protectionMask = LayerMask.GetMask("Construction", "Construction Trigger", "Trigger", "Deployed");
 
+                LoadConfigData();
                 DetectWipeModeFromTagsOrConfig();
 
-                if (configData.WipeStartUnixTime <= 0)
+                if (_config.WipeStartUnixTime <= 0)
                 {
                     long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                    configData.WipeStartUnixTime = now;
-                    SaveConfig(configData);
-                    lastStatusMessage = $"Wipe start time initialized at {DateTimeOffset.FromUnixTimeSeconds(now):u}.";
+                    _config.WipeStartUnixTime = now;
+                    SaveConfig(_config);
+                    _statusMsg = $"Wipe start initialized at {DateTimeOffset.FromUnixTimeSeconds(now):u}.";
                 }
 
-                pluginInitialized = true;
+                _initialized = true;
 
-                if (string.IsNullOrEmpty(lastStatusMessage) ||
-                    lastStatusMessage.StartsWith("Initializing", StringComparison.OrdinalIgnoreCase))
-                {
-                    lastStatusMessage = "ModernNoCupboardDecay initialized successfully.";
-                }
+                if (_statusMsg.StartsWith("Initializing", StringComparison.OrdinalIgnoreCase))
+                    _statusMsg = "Initialized successfully.";
 
                 PrintDebugSummary();
             }
             catch (Exception ex)
             {
-                pluginInitialized = false;
-                lastStatusMessage = $"Initialization error: {ex.Message}";
-                PrintError(lastStatusMessage);
+                _initialized = false;
+                _statusMsg = $"Init error: {ex.Message}";
+                PrintError(_statusMsg);
+            }
+        }
+
+        private void Unload()
+        {
+            // Destroy all active timers
+            foreach (var kvp in _debugTimers)
+                kvp.Value?.Destroy();
+
+            _debugTimers.Clear();
+            _debugUsers.Clear();
+
+            // Clean up UI for all connected players
+            foreach (var player in BasePlayer.activePlayerList)
+            {
+                if (player == null) continue;
+                CuiHelper.DestroyUi(player, UiWipe);
+                CuiHelper.DestroyUi(player, UiDebug);
             }
         }
 
         private void OnNewSave(string filename)
         {
+            if (_config == null) return;
+
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            configData.WipeStartUnixTime = now;
-            SaveConfig(configData);
-            lastStatusMessage = $"Detected new save '{filename}', wipe start reset to {DateTimeOffset.FromUnixTimeSeconds(now):u}.";
+            _config.WipeStartUnixTime = now;
+            SaveConfig(_config);
+            _statusMsg = $"New save '{filename}', wipe start reset to {DateTimeOffset.FromUnixTimeSeconds(now):u}.";
         }
 
-        // --------------------------
-        //  Wipe Mode Detection / Time
-        // --------------------------
+        #endregion
+
+        #region Wipe Detection
 
         private void DetectWipeModeFromTagsOrConfig()
         {
             WipeMode detected = WipeMode.Manual;
 
-            if (configData.AutoDetectWipeFromTags)
+            if (_config.AutoDetectWipeFromTags)
             {
                 try
                 {
@@ -401,51 +379,45 @@ namespace Oxide.Plugins
 
                     if (!string.IsNullOrEmpty(tags))
                     {
-                        string lowerTags = tags.ToLowerInvariant();
+                        string lower = tags.ToLowerInvariant();
 
-                        if (lowerTags.Contains("weekly"))
-                        {
+                        if (lower.Contains("weekly"))
                             detected = WipeMode.Weekly;
-                        }
-                        else if (lowerTags.Contains("biweekly") || lowerTags.Contains("bi-weekly"))
-                        {
+                        else if (lower.Contains("biweekly") || lower.Contains("bi-weekly"))
                             detected = WipeMode.BiWeekly;
-                        }
-                        else if (lowerTags.Contains("monthly"))
-                        {
+                        else if (lower.Contains("monthly"))
                             detected = WipeMode.Monthly;
-                        }
                         else
                         {
-                            int customDays = TryExtractDaysFromTags(lowerTags);
+                            int customDays = TryExtractDaysFromTags(lower);
                             if (customDays > 0)
                             {
                                 detected = WipeMode.CustomDays;
-                                configData.CustomWipeDays = customDays;
+                                _config.CustomWipeDays = customDays;
                             }
                         }
                     }
                 }
                 catch (Exception e)
                 {
-                    PrintWarning($"Error reading server tags for wipe mode detection: {e.Message}");
+                    PrintWarning($"Error reading server tags: {e.Message}");
                 }
             }
 
             if (detected != WipeMode.Manual)
             {
-                currentWipeMode = detected;
-                lastStatusMessage = $"Wipe mode auto-detected from server.tags: {currentWipeMode}" +
-                    (currentWipeMode == WipeMode.CustomDays && configData.CustomWipeDays > 0
-                        ? $" ({configData.CustomWipeDays} days)"
+                _wipeMode = detected;
+                _statusMsg = $"Wipe mode auto-detected: {_wipeMode}" +
+                    (_wipeMode == WipeMode.CustomDays && _config.CustomWipeDays > 0
+                        ? $" ({_config.CustomWipeDays} days)"
                         : ".");
                 return;
             }
 
-            currentWipeMode = ParseWipeMode(configData.WipeModeOverride);
-            lastStatusMessage = $"Wipe mode set from config override: {currentWipeMode}" +
-                (currentWipeMode == WipeMode.CustomDays && configData.CustomWipeDays > 0
-                    ? $" ({configData.CustomWipeDays} days)"
+            _wipeMode = ParseWipeMode(_config.WipeModeOverride);
+            _statusMsg = $"Wipe mode from config: {_wipeMode}" +
+                (_wipeMode == WipeMode.CustomDays && _config.CustomWipeDays > 0
+                    ? $" ({_config.CustomWipeDays} days)"
                     : ".");
         }
 
@@ -455,31 +427,29 @@ namespace Oxide.Plugins
                 return 0;
 
             var pieces = lowerTags.Split(',');
-            foreach (var piece in pieces)
+            for (int i = 0; i < pieces.Length; i++)
             {
-                string p = piece.Trim();
+                string p = pieces[i].Trim();
                 if (string.IsNullOrEmpty(p))
                     continue;
 
                 var tokens = p.Split(' ', '-', '_');
-                foreach (var token in tokens)
+                for (int j = 0; j < tokens.Length; j++)
                 {
-                    string t = token.Trim();
+                    string t = tokens[j].Trim();
                     if (string.IsNullOrEmpty(t))
                         continue;
 
                     if (t.EndsWith("days"))
-                        t = t.Substring(0, t.Length - "days".Length);
+                        t = t.Substring(0, t.Length - 4);
                     else if (t.EndsWith("day"))
-                        t = t.Substring(0, t.Length - "day".Length);
+                        t = t.Substring(0, t.Length - 3);
                     else if (t.EndsWith("d"))
                         t = t.Substring(0, t.Length - 1);
 
-                    if (int.TryParse(t, NumberStyles.Integer, CultureInfo.InvariantCulture, out int days))
-                    {
-                        if (days >= 2 && days <= 60)
-                            return days;
-                    }
+                    if (int.TryParse(t, NumberStyles.Integer, CultureInfo.InvariantCulture, out int days)
+                        && days >= 2 && days <= 60)
+                        return days;
                 }
             }
 
@@ -493,63 +463,55 @@ namespace Oxide.Plugins
 
             string lower = mode.Trim().ToLowerInvariant();
 
-            string numericCandidate = lower;
-            if (numericCandidate.EndsWith("days"))
-                numericCandidate = numericCandidate.Substring(0, numericCandidate.Length - "days".Length);
-            else if (numericCandidate.EndsWith("day"))
-                numericCandidate = numericCandidate.Substring(0, numericCandidate.Length - "day".Length);
-            else if (numericCandidate.EndsWith("d"))
-                numericCandidate = numericCandidate.Substring(0, numericCandidate.Length - 1);
+            string numPart = lower;
+            if (numPart.EndsWith("days"))
+                numPart = numPart.Substring(0, numPart.Length - 4);
+            else if (numPart.EndsWith("day"))
+                numPart = numPart.Substring(0, numPart.Length - 3);
+            else if (numPart.EndsWith("d"))
+                numPart = numPart.Substring(0, numPart.Length - 1);
 
-            if (int.TryParse(numericCandidate, NumberStyles.Integer, CultureInfo.InvariantCulture, out int days) && days > 0)
+            if (int.TryParse(numPart, NumberStyles.Integer, CultureInfo.InvariantCulture, out int days) && days > 0)
             {
-                configData.CustomWipeDays = days;
+                _config.CustomWipeDays = days;
                 return WipeMode.CustomDays;
             }
 
             switch (lower)
             {
-                case "weekly":
-                    return WipeMode.Weekly;
+                case "weekly":     return WipeMode.Weekly;
                 case "biweekly":
-                case "bi-weekly":
-                    return WipeMode.BiWeekly;
-                case "monthly":
-                    return WipeMode.Monthly;
-                default:
-                    return WipeMode.Manual;
+                case "bi-weekly":  return WipeMode.BiWeekly;
+                case "monthly":    return WipeMode.Monthly;
+                default:           return WipeMode.Manual;
             }
         }
 
         private TimeSpan GetWipeDuration()
         {
-            switch (currentWipeMode)
+            switch (_wipeMode)
             {
-                case WipeMode.Weekly:
-                    return TimeSpan.FromDays(7);
-                case WipeMode.BiWeekly:
-                    return TimeSpan.FromDays(14);
-                case WipeMode.Monthly:
-                    return TimeSpan.FromDays(30);
+                case WipeMode.Weekly:     return TimeSpan.FromDays(7);
+                case WipeMode.BiWeekly:   return TimeSpan.FromDays(14);
+                case WipeMode.Monthly:    return TimeSpan.FromDays(30);
                 case WipeMode.CustomDays:
-                    if (configData.CustomWipeDays > 0)
-                        return TimeSpan.FromDays(configData.CustomWipeDays);
-                    return TimeSpan.Zero;
-                default:
-                    return TimeSpan.Zero;
+                    return _config.CustomWipeDays > 0
+                        ? TimeSpan.FromDays(_config.CustomWipeDays)
+                        : TimeSpan.Zero;
+                default: return TimeSpan.Zero;
             }
         }
 
         private long GetWipeEndUnixTime()
         {
-            if (configData.WipeStartUnixTime <= 0)
+            if (_config.WipeStartUnixTime <= 0)
                 return 0;
 
             TimeSpan dur = GetWipeDuration();
             if (dur == TimeSpan.Zero)
                 return 0;
 
-            return configData.WipeStartUnixTime + (long)dur.TotalSeconds;
+            return _config.WipeStartUnixTime + (long)dur.TotalSeconds;
         }
 
         private TimeSpan? GetWipeTimeRemaining()
@@ -558,13 +520,8 @@ namespace Oxide.Plugins
             if (wipeEnd <= 0)
                 return null;
 
-            long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            long delta = wipeEnd - now;
-
-            if (delta <= 0)
-                return TimeSpan.Zero;
-
-            return TimeSpan.FromSeconds(delta);
+            long delta = wipeEnd - DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            return delta <= 0 ? TimeSpan.Zero : TimeSpan.FromSeconds(delta);
         }
 
         private string FormatTimeSpan(TimeSpan ts)
@@ -572,49 +529,50 @@ namespace Oxide.Plugins
             return $"{ts.Days}d {ts.Hours}h {ts.Minutes}m";
         }
 
-        private void PrintDebugSummary()
+        private string GetWipeModeDisplayString()
         {
-            Puts("[ModernNoCupboardDecay] Config & wipe state loaded:");
-            Puts($" - Version: {Version}");
-            Puts($" - CheckAuth: {configData.CheckAuth}");
-            Puts($" - TeamAwareProtection: {configData.TeamAwareProtection}");
-            Puts($" - EntityRadius: {configData.EntityRadius}");
-            Puts($" - AutoDetectWipeFromTags: {configData.AutoDetectWipeFromTags}");
-            Puts($" - WipeModeOverride: {configData.WipeModeOverride}");
-            Puts($" - CustomWipeDays: {configData.CustomWipeDays}");
-            Puts($" - WipeMode (active): {currentWipeMode}");
-            Puts($" - WipeStartUnixTime: {configData.WipeStartUnixTime} ({(configData.WipeStartUnixTime > 0 ? DateTimeOffset.FromUnixTimeSeconds(configData.WipeStartUnixTime).ToString("u") : "unset")})");
-
-            var remaining = GetWipeTimeRemaining();
-            if (remaining != null)
-                Puts($" - Wipe ends in: {FormatTimeSpan(remaining.Value)}");
-            else
-                Puts(" - Wipe end: N/A (manual or missing data).");
+            string mode = _wipeMode.ToString();
+            if (_wipeMode == WipeMode.CustomDays && _config.CustomWipeDays > 0)
+                mode += $" ({_config.CustomWipeDays}d)";
+            return mode;
         }
 
-        // ---------------
-        //  Core Decay Logic
-        // ---------------
+        private void PrintDebugSummary()
+        {
+            Puts("[ModernNoCupboardDecay] Config loaded:");
+            Puts($"  Version: {Version}");
+            Puts($"  CheckAuth: {_config.CheckAuth} | TeamAware: {_config.TeamAwareProtection}");
+            Puts($"  EntityRadius: {_config.EntityRadius}");
+            Puts($"  AutoDetect: {_config.AutoDetectWipeFromTags} | WipeMode: {_wipeMode}");
+            Puts($"  WipeStart: {(_config.WipeStartUnixTime > 0 ? DateTimeOffset.FromUnixTimeSeconds(_config.WipeStartUnixTime).ToString("u") : "unset")}");
+
+            var remaining = GetWipeTimeRemaining();
+            Puts(remaining != null
+                ? $"  Wipe ends in: {FormatTimeSpan(remaining.Value)}"
+                : "  Wipe end: N/A (manual or missing data).");
+        }
+
+        #endregion
+
+        #region Core Decay Logic
 
         private object OnEntityTakeDamage(BaseCombatEntity entity, HitInfo info)
         {
-            if (entity == null || info == null)
+            if (!_initialized || entity == null || info == null)
                 return null;
 
             if (!info.damageTypes.Has(DamageType.Decay))
                 return null;
 
-            if (IsEntityWithinCupboardProtection(entity, info))
-            {
+            if (IsPositionProtected(entity.transform.position, GetOwnerId(entity, info)))
                 info.damageTypes.Scale(DamageType.Decay, 0f);
-            }
 
             return null;
         }
 
-        // -------------------
-        //  Cupboard / Auth Logic
-        // -------------------
+        #endregion
+
+        #region Cupboard Protection
 
         private static ulong GetOwnerId(BaseCombatEntity entity, HitInfo info)
         {
@@ -627,59 +585,58 @@ namespace Oxide.Plugins
             return 0;
         }
 
-        private bool IsEntityWithinCupboardProtection(BaseEntity entity, HitInfo info)
+        /// <summary>
+        /// Unified protection check used by both decay prevention and debug overlay.
+        /// Searches for BuildingPrivlidge within the configured radius using a
+        /// pre-allocated collider buffer (zero GC allocation).
+        /// </summary>
+        private bool IsPositionProtected(Vector3 position, ulong ownerId)
         {
-            if (entity == null)
-                return false;
+            int count = Physics.OverlapSphereNonAlloc(position, _config.EntityRadius, HitBuffer, _protectionMask);
 
-            int mask = LayerMask.GetMask("Construction", "Construction Trigger", "Trigger", "Deployed");
-            float radius = configData.EntityRadius;
-
-            var colliders = Physics.OverlapSphere(entity.transform.position, radius, mask);
-
-            if (colliders == null || colliders.Length == 0)
-                return false;
-
-            if (!configData.CheckAuth)
+            if (!_config.CheckAuth)
             {
-                foreach (var col in colliders)
+                // Fast path: any TC in range means protected
+                for (int i = 0; i < count; i++)
                 {
-                    var anyPriv = col.GetComponentInParent<BuildingPrivlidge>();
-                    if (anyPriv != null)
+                    if (HitBuffer[i].GetComponentInParent<BuildingPrivlidge>() != null)
                         return true;
                 }
-
                 return false;
             }
 
-            ulong ownerId = GetOwnerId(entity as BaseCombatEntity, info);
+            // Auth path: entity owner must be authed or on the team of an authed player
             if (ownerId == 0)
                 return false;
 
-            foreach (var col in colliders)
+            for (int i = 0; i < count; i++)
             {
-                var priv = col.GetComponentInParent<BuildingPrivlidge>();
-                if (priv == null)
-                    continue;
-
-                if (IsOwnerAuthorizedOrTeammate(priv, ownerId))
+                var priv = HitBuffer[i].GetComponentInParent<BuildingPrivlidge>();
+                if (priv != null && IsOwnerAuthorizedOrTeammate(priv, ownerId))
                     return true;
             }
 
             return false;
         }
 
+        /// <summary>
+        /// Checks if ownerId is directly authorized on the TC, or is a Rust team
+        /// member of someone who is authorized.
+        /// Uses ProtoBuf.PlayerNameID.userid for Oxide v2.0.7022+ compatibility.
+        /// </summary>
         private bool IsOwnerAuthorizedOrTeammate(BuildingPrivlidge priv, ulong ownerId)
         {
             if (priv == null || ownerId == 0)
                 return false;
 
-            if (CupboardAuthCheck(priv, ownerId))
+            // Direct auth check
+            if (IsAuthorizedOnCupboard(priv, ownerId))
                 return true;
 
-            if (!configData.TeamAwareProtection)
+            if (!_config.TeamAwareProtection)
                 return false;
 
+            // Team-aware check
             var rm = RelationshipManager.ServerInstance;
             if (rm == null)
                 return false;
@@ -688,15 +645,17 @@ namespace Oxide.Plugins
             if (ownerTeam == null)
                 return false;
 
-            if (ownerTeam.members.Contains(priv.OwnerID))
+            // Check if TC owner is on the entity owner's team
+            if (priv.OwnerID != 0 && ownerTeam.members.Contains(priv.OwnerID))
                 return true;
 
+            // Check if any authed player is on the entity owner's team
             var authList = priv.authorizedPlayers;
             if (authList != null)
             {
-                foreach (var authUserId in authList)
+                for (int i = 0; i < authList.Count; i++)
                 {
-                    if (ownerTeam.members.Contains(authUserId))
+                    if (ownerTeam.members.Contains(authList[i].userid))
                         return true;
                 }
             }
@@ -704,103 +663,45 @@ namespace Oxide.Plugins
             return false;
         }
 
-        private bool CupboardAuthCheck(BuildingPrivlidge priv, ulong ownerId)
+        /// <summary>
+        /// Checks the TC authorized player list using PlayerNameID.userid.
+        /// This is the correct access pattern for Oxide v2.0.7022+ where
+        /// authorizedPlayers is List&lt;ProtoBuf.PlayerNameID&gt;.
+        /// </summary>
+        private bool IsAuthorizedOnCupboard(BuildingPrivlidge priv, ulong ownerId)
         {
-            if (priv == null || ownerId == 0)
-                return false;
-
             var authList = priv.authorizedPlayers;
             if (authList == null || authList.Count == 0)
                 return false;
 
-            foreach (var authUserId in authList)
+            for (int i = 0; i < authList.Count; i++)
             {
-                if (authUserId == ownerId)
+                if (authList[i].userid == ownerId)
                     return true;
             }
 
             return false;
         }
 
-        private bool IsPlayerInProtectedZone(BasePlayer player)
-        {
-            if (player == null || !player.IsAlive())
-                return false;
+        #endregion
 
-            int mask = LayerMask.GetMask("Construction", "Construction Trigger", "Trigger", "Deployed");
-            float radius = configData.EntityRadius;
-
-            var colliders = Physics.OverlapSphere(player.transform.position, radius, mask);
-            if (colliders == null || colliders.Length == 0)
-                return false;
-
-            if (!configData.CheckAuth)
-            {
-                foreach (var col in colliders)
-                {
-                    var anyPriv = col.GetComponentInParent<BuildingPrivlidge>();
-                    if (anyPriv != null)
-                        return true;
-                }
-
-                return false;
-            }
-
-            ulong userId = player.userID;
-            if (userId == 0)
-                return false;
-
-            foreach (var col in colliders)
-            {
-                var priv = col.GetComponentInParent<BuildingPrivlidge>();
-                if (priv == null)
-                    continue;
-
-                if (IsOwnerAuthorizedOrTeammate(priv, userId))
-                    return true;
-            }
-
-            return false;
-        }
-
-        // ----------------------
-        //  Permissions & helpers
-        // ----------------------
+        #region Permissions & Helpers
 
         private bool HasAdminPerm(BasePlayer player)
         {
-            if (player == null)
-                return false;
-
-            if (player.IsAdmin)
-                return true;
-
-            return permission.UserHasPermission(player.UserIDString, permAdmin);
+            return player != null && (player.IsAdmin || permission.UserHasPermission(player.UserIDString, PermAdmin));
         }
 
         private bool HasDebugPerm(BasePlayer player)
         {
-            if (player == null)
-                return false;
-
-            if (player.IsAdmin)
-                return true;
-
-            return permission.UserHasPermission(player.UserIDString, permDebug);
+            return player != null && (player.IsAdmin || permission.UserHasPermission(player.UserIDString, PermDebug));
         }
 
         private bool HasPreviewPerm(BasePlayer player)
         {
-            if (player == null)
-                return false;
-
-            if (!configData.PreviewRequiresPermission)
-                return true;
-
-            if (player.IsAdmin)
-                return true;
-
-            return permission.UserHasPermission(player.UserIDString, permPreview);
+            if (player == null) return false;
+            if (!_config.PreviewRequiresPermission) return true;
+            return player.IsAdmin || permission.UserHasPermission(player.UserIDString, PermPreview);
         }
 
         private bool TryParseBool(string value, out bool result)
@@ -809,20 +710,17 @@ namespace Oxide.Plugins
             if (string.IsNullOrEmpty(value))
                 return false;
 
-            string v = value.Trim().ToLowerInvariant();
-            if (v == "true" || v == "1" || v == "yes" || v == "on")
+            switch (value.Trim().ToLowerInvariant())
             {
-                result = true;
-                return true;
+                case "true": case "1": case "yes": case "on":
+                    result = true;
+                    return true;
+                case "false": case "0": case "no": case "off":
+                    result = false;
+                    return true;
+                default:
+                    return false;
             }
-
-            if (v == "false" || v == "0" || v == "no" || v == "off")
-            {
-                result = false;
-                return true;
-            }
-
-            return false;
         }
 
         private bool TryParseFloat(string s, out float f)
@@ -841,7 +739,7 @@ namespace Oxide.Plugins
                 return false;
 
             return float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out x)
-                   && float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out y);
+                && float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out y);
         }
 
         private string ToAnchorString(float x, float y)
@@ -849,155 +747,105 @@ namespace Oxide.Plugins
             return $"{x.ToString("0.###", CultureInfo.InvariantCulture)} {y.ToString("0.###", CultureInfo.InvariantCulture)}";
         }
 
-        private float Clamp01(float v)
+        private void Reply(BasePlayer player, ConsoleSystem.Arg arg, string message)
         {
-            if (v < 0f) return 0f;
-            if (v > 1f) return 1f;
-            return v;
+            if (player != null)
+                SendReply(player, message);
+            else if (arg != null)
+                Puts(message);
         }
 
-        // ----------------------
-        //  Status Commands
-        // ----------------------
+        #endregion
+
+        #region Status Commands
 
         [ChatCommand("mncd")]
-        private void ChatCommandMncd(BasePlayer player, string command, string[] args)
+        private void CmdMncdChat(BasePlayer player, string command, string[] args)
         {
-            if (player == null)
-                return;
-
-            var report = GetStatusReport(player.UserIDString);
-            SendReply(player, report);
+            if (player == null) return;
+            SendReply(player, GetStatusReport(player.UserIDString));
         }
 
         [ConsoleCommand("mncd")]
-        private void ConsoleCommandMncd(ConsoleSystem.Arg arg)
+        private void CmdMncdConsole(ConsoleSystem.Arg arg)
         {
             var player = arg?.Player();
-            var userId = player?.UserIDString;
-            var report = GetStatusReport(userId);
-
-            if (player != null)
-                SendReply(player, report);
-            else
-                Puts(report);
+            var report = GetStatusReport(player?.UserIDString);
+            Reply(player, arg, report);
         }
 
         private string GetStatusReport(string userId = null)
         {
-            string name = Title;
-            string version = Version.ToString();
-
-            string initState = pluginInitialized ? "ENABLED" : "NOT FULLY INITIALIZED";
-            string wipeModeStr = currentWipeMode.ToString();
-            if (currentWipeMode == WipeMode.CustomDays && configData.CustomWipeDays > 0)
-                wipeModeStr += $" ({configData.CustomWipeDays}d)";
-
-            string wipeRemainStr = "N/A";
+            string initState = _initialized ? "ENABLED" : "NOT INITIALIZED";
+            string wipeRemain = "N/A";
             var remaining = GetWipeTimeRemaining();
             if (remaining != null)
-                wipeRemainStr = FormatTimeSpan(remaining.Value);
+                wipeRemain = FormatTimeSpan(remaining.Value);
 
             return Msg("Status.Report", userId,
-                name,
-                version,
-                initState,
-                configData.EntityRadius,
-                configData.CheckAuth,
-                configData.TeamAwareProtection,
-                configData.AutoDetectWipeFromTags,
-                wipeModeStr,
-                configData.WipeModeOverride,
-                wipeRemainStr,
-                lastStatusMessage
-            );
+                Title, Version,
+                initState, _config.EntityRadius,
+                _config.CheckAuth, _config.TeamAwareProtection,
+                _config.AutoDetectWipeFromTags, GetWipeModeDisplayString(),
+                _config.WipeModeOverride, wipeRemain, _statusMsg);
         }
 
-        // ----------------------
-        //  HELP COMMANDS
-        // ----------------------
+        #endregion
+
+        #region Help Commands
 
         [ChatCommand("mncdhelp")]
-        private void ChatCommandMncdHelp(BasePlayer player, string command, string[] args)
+        private void CmdHelpChat(BasePlayer player, string command, string[] args)
         {
-            if (player == null)
-                return;
-
-            string userId = player.UserIDString;
-            string topic = args != null && args.Length > 0 ? args[0].ToLowerInvariant() : "general";
-
-            var text = BuildHelpText(topic, userId);
-            SendReply(player, text);
+            if (player == null) return;
+            string topic = (args != null && args.Length > 0) ? args[0].ToLowerInvariant() : "general";
+            SendReply(player, BuildHelpText(topic, player.UserIDString));
         }
 
         [ConsoleCommand("mncd.help")]
-        private void ConsoleCommandMncdHelp(ConsoleSystem.Arg arg)
+        private void CmdHelpConsole(ConsoleSystem.Arg arg)
         {
             var player = arg?.Player();
-            string userId = player?.UserIDString;
-
-            string topic = (arg.Args != null && arg.Args.Length > 0)
+            string topic = (arg?.Args != null && arg.Args.Length > 0)
                 ? arg.Args[0].ToLowerInvariant()
                 : "general";
 
-            var text = BuildHelpText(topic, userId);
-
-            if (player != null)
-                SendReply(player, text);
-            else
-                Puts(text);
+            Reply(player, arg, BuildHelpText(topic, player?.UserIDString));
         }
 
         private string BuildHelpText(string topic, string userId)
         {
-            string header = string.Format(Msg("Help.Header", userId), Version.ToString());
+            string header = Msg("Help.Header", userId, Version.ToString());
 
             switch (topic)
             {
-                case "general":
-                case "main":
-                case "help":
+                case "general": case "main": case "help":
                     return header + "\n" + Msg("Help.General", userId);
-
                 case "basic":
                     return header + "\n" + Msg("Help.Topic.basic", userId);
-
-                case "ui":
-                case "panel":
+                case "ui": case "panel":
                     return header + "\n" + Msg("Help.Topic.ui", userId);
-
-                case "set":
-                case "config":
-                case "settings":
+                case "set": case "config": case "settings":
                     return header + "\n" + Msg("Help.Topic.set", userId);
-
                 case "debug":
                     return header + "\n" + Msg("Help.Topic.debug", userId);
-
-                case "preview":
-                case "ring":
-                case "radius":
+                case "preview": case "ring": case "radius":
                     return header + "\n" + Msg("Help.Topic.preview", userId);
-
-                case "wipe":
-                case "wipemode":
-                case "wipes":
+                case "wipe": case "wipemode": case "wipes":
                     return header + "\n" + Msg("Help.Topic.wipe", userId);
-
                 default:
                     return header + "\n" + Msg("Help.UnknownTopic", userId, topic);
             }
         }
 
-        // ----------------------
-        //  Config Commands
-        // ----------------------
+        #endregion
+
+        #region Config Commands
 
         [ChatCommand("mncdset")]
-        private void ChatCommandMncdSet(BasePlayer player, string command, string[] args)
+        private void CmdSetChat(BasePlayer player, string command, string[] args)
         {
-            if (player == null)
-                return;
+            if (player == null) return;
 
             if (!HasAdminPerm(player))
             {
@@ -1011,15 +859,12 @@ namespace Oxide.Plugins
                 return;
             }
 
-            string option = args[0];
-            string value = args.Length > 1 ? args[1] : null;
-
-            string result = ApplyConfigChange(option, value, player.UserIDString);
+            string result = ApplyConfigChange(args[0], args.Length > 1 ? args[1] : null, player.UserIDString);
             SendReply(player, result);
         }
 
         [ConsoleCommand("mncd.set")]
-        private void ConsoleCommandMncdSet(ConsoleSystem.Arg arg)
+        private void CmdSetConsole(ConsoleSystem.Arg arg)
         {
             var player = arg?.Player();
             var userId = player?.UserIDString;
@@ -1030,25 +875,14 @@ namespace Oxide.Plugins
                 return;
             }
 
-            if (arg.Args == null || arg.Args.Length == 0)
+            if (arg?.Args == null || arg.Args.Length == 0)
             {
-                string usage = Msg("Usage.MncdSet.Console", userId);
-                if (player != null)
-                    SendReply(player, usage);
-                else
-                    Puts(usage);
+                Reply(player, arg, Msg("Usage.MncdSet.Console", userId));
                 return;
             }
 
-            string option = arg.Args[0];
-            string value = arg.Args.Length > 1 ? arg.Args[1] : null;
-
-            string result = ApplyConfigChange(option, value, userId);
-
-            if (player != null)
-                SendReply(player, result);
-            else
-                Puts(result);
+            string result = ApplyConfigChange(arg.Args[0], arg.Args.Length > 1 ? arg.Args[1] : null, userId);
+            Reply(player, arg, result);
         }
 
         private string ApplyConfigChange(string option, string value, string userId)
@@ -1066,10 +900,9 @@ namespace Oxide.Plugins
                     {
                         if (!TryParseBool(value, out bool b))
                             return Msg("Error.CheckAuthValue", userId);
-
-                        configData.CheckAuth = b;
-                        SaveConfig(configData);
-                        lastStatusMessage = $"CheckAuth set to {b}.";
+                        _config.CheckAuth = b;
+                        SaveConfig(_config);
+                        _statusMsg = $"CheckAuth set to {b}.";
                         return Msg("Config.CheckAuth.Set", userId, b);
                     }
 
@@ -1079,25 +912,24 @@ namespace Oxide.Plugins
                     {
                         if (!TryParseBool(value, out bool b))
                             return Msg("Error.TeamAwareValue", userId);
-
-                        configData.TeamAwareProtection = b;
-                        SaveConfig(configData);
-                        lastStatusMessage = $"TeamAwareProtection set to {b}.";
+                        _config.TeamAwareProtection = b;
+                        SaveConfig(_config);
+                        _statusMsg = $"TeamAwareProtection set to {b}.";
                         return Msg("Config.TeamAware.Set", userId, b);
                     }
 
                     case "radius":
                     case "entityradius":
                     {
-                        if (string.IsNullOrEmpty(value))
+                        if (string.IsNullOrEmpty(value) ||
+                            !float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float r) ||
+                            r <= 0f)
                             return Msg("Error.RadiusValue", userId);
 
-                        if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float r) || r <= 0f)
-                            return Msg("Error.RadiusValue", userId);
-
-                        configData.EntityRadius = r;
-                        SaveConfig(configData);
-                        lastStatusMessage = $"EntityRadius set to {r}.";
+                        r = Mathf.Clamp(r, 1f, 500f);
+                        _config.EntityRadius = r;
+                        SaveConfig(_config);
+                        _statusMsg = $"EntityRadius set to {r}.";
                         return Msg("Config.Radius.Set", userId, r);
                     }
 
@@ -1106,12 +938,10 @@ namespace Oxide.Plugins
                     {
                         if (!TryParseBool(value, out bool b))
                             return Msg("Error.AutoDetectValue", userId);
-
-                        configData.AutoDetectWipeFromTags = b;
-                        SaveConfig(configData);
-
+                        _config.AutoDetectWipeFromTags = b;
+                        SaveConfig(_config);
                         DetectWipeModeFromTagsOrConfig();
-                        return Msg("Config.AutoDetect.Set", userId, b, currentWipeMode);
+                        return Msg("Config.AutoDetect.Set", userId, b, _wipeMode);
                     }
 
                     case "wipemode":
@@ -1119,13 +949,11 @@ namespace Oxide.Plugins
                     {
                         if (string.IsNullOrEmpty(value))
                             return Msg("Error.WipeModeValue", userId);
-
-                        configData.WipeModeOverride = value;
-                        configData.AutoDetectWipeFromTags = false;
-                        SaveConfig(configData);
-
+                        _config.WipeModeOverride = value;
+                        _config.AutoDetectWipeFromTags = false;
+                        SaveConfig(_config);
                         DetectWipeModeFromTagsOrConfig();
-                        return Msg("Config.WipeMode.Set", userId, value, currentWipeMode);
+                        return Msg("Config.WipeMode.Set", userId, value, _wipeMode);
                     }
 
                     case "wipestartnow":
@@ -1133,14 +961,12 @@ namespace Oxide.Plugins
                     case "wipe-reset":
                     {
                         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                        configData.WipeStartUnixTime = now;
-                        SaveConfig(configData);
-                        lastStatusMessage = $"WipeStartUnixTime reset to now: {DateTimeOffset.FromUnixTimeSeconds(now):u}.";
-
+                        _config.WipeStartUnixTime = now;
+                        SaveConfig(_config);
+                        _statusMsg = $"WipeStartUnixTime reset to {DateTimeOffset.FromUnixTimeSeconds(now):u}.";
                         var remaining = GetWipeTimeRemaining();
                         string remainStr = remaining != null ? FormatTimeSpan(remaining.Value) : "N/A";
-
-                        return Msg("Config.WipeStartNow.Set", userId, currentWipeMode, remainStr);
+                        return Msg("Config.WipeStartNow.Set", userId, _wipeMode, remainStr);
                     }
 
                     default:
@@ -1149,20 +975,19 @@ namespace Oxide.Plugins
             }
             catch (Exception e)
             {
-                lastStatusMessage = $"Config change error on '{opt}': {e.Message}";
+                _statusMsg = $"Config error on '{opt}': {e.Message}";
                 return Msg("Error.ConfigApply", userId, opt, e.Message);
             }
         }
 
-        // ----------------------
-        //  UI Anchor Commands (Absolute)
-        // ----------------------
+        #endregion
+
+        #region UI Anchor Commands
 
         [ChatCommand("mncdui")]
-        private void ChatCommandMncdUi(BasePlayer player, string command, string[] args)
+        private void CmdUiChat(BasePlayer player, string command, string[] args)
         {
-            if (player == null)
-                return;
+            if (player == null) return;
 
             if (!HasAdminPerm(player))
             {
@@ -1176,10 +1001,8 @@ namespace Oxide.Plugins
                 return;
             }
 
-            if (!TryParseFloat(args[0], out float minX) ||
-                !TryParseFloat(args[1], out float minY) ||
-                !TryParseFloat(args[2], out float maxX) ||
-                !TryParseFloat(args[3], out float maxY))
+            if (!TryParseFloat(args[0], out float minX) || !TryParseFloat(args[1], out float minY) ||
+                !TryParseFloat(args[2], out float maxX) || !TryParseFloat(args[3], out float maxY))
             {
                 SendReply(player, Msg("UIAnchor.Error.Numeric", player.UserIDString));
                 return;
@@ -1191,18 +1014,13 @@ namespace Oxide.Plugins
                 return;
             }
 
-            configData.UiAnchorMin = ToAnchorString(minX, minY);
-            configData.UiAnchorMax = ToAnchorString(maxX, maxY);
-            SaveConfig(configData);
-
+            SetUiAnchors(minX, minY, maxX, maxY);
             SendReply(player, Msg("UIAnchor.Set", player.UserIDString, minX, minY, maxX, maxY));
-
             DestroyWipeTimerUI(player);
-            SendReply(player, "Reopen a Tool Cupboard to see the new UI position.");
         }
 
         [ConsoleCommand("mncd.ui")]
-        private void ConsoleCommandMncdUi(ConsoleSystem.Arg arg)
+        private void CmdUiConsole(ConsoleSystem.Arg arg)
         {
             var player = arg?.Player();
             var userId = player?.UserIDString;
@@ -1213,59 +1031,37 @@ namespace Oxide.Plugins
                 return;
             }
 
-            if (arg.Args == null || arg.Args.Length != 4)
+            if (arg?.Args == null || arg.Args.Length != 4)
             {
-                string usage = Msg("UIAnchor.Usage.Console", userId);
-                if (player != null) SendReply(player, usage);
-                else Puts(usage);
+                Reply(player, arg, Msg("UIAnchor.Usage.Console", userId));
                 return;
             }
 
-            if (!TryParseFloat(arg.Args[0], out float minX) ||
-                !TryParseFloat(arg.Args[1], out float minY) ||
-                !TryParseFloat(arg.Args[2], out float maxX) ||
-                !TryParseFloat(arg.Args[3], out float maxY))
+            if (!TryParseFloat(arg.Args[0], out float minX) || !TryParseFloat(arg.Args[1], out float minY) ||
+                !TryParseFloat(arg.Args[2], out float maxX) || !TryParseFloat(arg.Args[3], out float maxY))
             {
-                string msg = Msg("UIAnchor.Error.Numeric", userId);
-                if (player != null) SendReply(player, msg);
-                else Puts(msg);
+                Reply(player, arg, Msg("UIAnchor.Error.Numeric", userId));
                 return;
             }
 
             if (minX >= maxX || minY >= maxY)
             {
-                string msg = Msg("UIAnchor.Error.Order", userId);
-                if (player != null) SendReply(player, msg);
-                else Puts(msg);
+                Reply(player, arg, Msg("UIAnchor.Error.Order", userId));
                 return;
             }
 
-            configData.UiAnchorMin = ToAnchorString(minX, minY);
-            configData.UiAnchorMax = ToAnchorString(maxX, maxY);
-            SaveConfig(configData);
-
+            SetUiAnchors(minX, minY, maxX, maxY);
             string confirm = Msg("UIAnchor.Set", userId, minX, minY, maxX, maxY);
+            Reply(player, arg, confirm);
+
             if (player != null)
-            {
-                SendReply(player, confirm);
                 DestroyWipeTimerUI(player);
-                SendReply(player, "Reopen a Tool Cupboard to see the new UI position.");
-            }
-            else
-            {
-                Puts(confirm);
-            }
         }
 
-        // ----------------------
-        //  UI Anchor Commands (Incremental / "Live Drag")
-        // ----------------------
-
         [ChatCommand("mncduiadd")]
-        private void ChatCommandMncdUiAdd(BasePlayer player, string command, string[] args)
+        private void CmdUiAddChat(BasePlayer player, string command, string[] args)
         {
-            if (player == null)
-                return;
+            if (player == null) return;
 
             if (!HasAdminPerm(player))
             {
@@ -1285,11 +1081,15 @@ namespace Oxide.Plugins
                 return;
             }
 
-            ApplyUiOffset(player, dx, dy, true);
+            ApplyUiOffset(dx, dy);
+            float minX, minY, maxX, maxY;
+            GetCurrentAnchors(out minX, out minY, out maxX, out maxY);
+            SendReply(player, Msg("Config.UIAdd.Set", player.UserIDString, dx, dy, minX, minY, maxX, maxY));
+            DestroyWipeTimerUI(player);
         }
 
         [ConsoleCommand("mncd.uiadd")]
-        private void ConsoleCommandMncdUiAdd(ConsoleSystem.Arg arg)
+        private void CmdUiAddConsole(ConsoleSystem.Arg arg)
         {
             var player = arg?.Player();
             var userId = player?.UserIDString;
@@ -1300,30 +1100,31 @@ namespace Oxide.Plugins
                 return;
             }
 
-            if (arg.Args == null || arg.Args.Length != 2)
+            if (arg?.Args == null || arg.Args.Length != 2)
             {
-                string usage = Msg("Usage.UIAdd.Console", userId);
-                if (player != null) SendReply(player, usage);
-                else Puts(usage);
+                Reply(player, arg, Msg("Usage.UIAdd.Console", userId));
                 return;
             }
 
             if (!TryParseFloat(arg.Args[0], out float dx) || !TryParseFloat(arg.Args[1], out float dy))
             {
-                string msg = Msg("UIAnchor.Error.Numeric", userId);
-                if (player != null) SendReply(player, msg);
-                else Puts(msg);
+                Reply(player, arg, Msg("UIAnchor.Error.Numeric", userId));
                 return;
             }
 
-            ApplyUiOffset(player, dx, dy, false);
+            ApplyUiOffset(dx, dy);
+            float minX, minY, maxX, maxY;
+            GetCurrentAnchors(out minX, out minY, out maxX, out maxY);
+            Reply(player, arg, Msg("Config.UIAdd.Set", userId, dx, dy, minX, minY, maxX, maxY));
+
+            if (player != null)
+                DestroyWipeTimerUI(player);
         }
 
         [ChatCommand("mncdresetui")]
-        private void ChatCommandMncdResetUi(BasePlayer player, string command, string[] args)
+        private void CmdResetUiChat(BasePlayer player, string command, string[] args)
         {
-            if (player == null)
-                return;
+            if (player == null) return;
 
             if (!HasAdminPerm(player))
             {
@@ -1331,11 +1132,13 @@ namespace Oxide.Plugins
                 return;
             }
 
-            ResetUiAnchors(player, true);
+            ResetUiAnchors();
+            SendReply(player, Msg("Config.UIReset.Set", player.UserIDString));
+            DestroyWipeTimerUI(player);
         }
 
         [ConsoleCommand("mncd.resetui")]
-        private void ConsoleCommandMncdResetUi(ConsoleSystem.Arg arg)
+        private void CmdResetUiConsole(ConsoleSystem.Arg arg)
         {
             var player = arg?.Player();
             var userId = player?.UserIDString;
@@ -1346,74 +1149,61 @@ namespace Oxide.Plugins
                 return;
             }
 
-            ResetUiAnchors(player, false);
+            ResetUiAnchors();
+            Reply(player, arg, Msg("Config.UIReset.Set", userId));
+
+            if (player != null)
+                DestroyWipeTimerUI(player);
         }
 
-        private void ApplyUiOffset(BasePlayer player, float dx, float dy, bool notifyPlayer)
+        private void SetUiAnchors(float minX, float minY, float maxX, float maxY)
         {
-            float minX, minY, maxX, maxY;
-            if (!TryParseAnchor(configData.UiAnchorMin, out minX, out minY) ||
-                !TryParseAnchor(configData.UiAnchorMax, out maxX, out maxY))
+            _config.UiAnchorMin = ToAnchorString(minX, minY);
+            _config.UiAnchorMax = ToAnchorString(maxX, maxY);
+            SaveConfig(_config);
+        }
+
+        private void GetCurrentAnchors(out float minX, out float minY, out float maxX, out float maxY)
+        {
+            if (!TryParseAnchor(_config.UiAnchorMin, out minX, out minY) ||
+                !TryParseAnchor(_config.UiAnchorMax, out maxX, out maxY))
             {
                 minX = 0.4f; minY = 0.92f;
                 maxX = 0.6f; maxY = 0.98f;
             }
-
-            minX = Clamp01(minX + dx);
-            maxX = Clamp01(maxX + dx);
-            minY = Clamp01(minY + dy);
-            maxY = Clamp01(maxY + dy);
-
-            if (minX >= maxX)
-                maxX = Clamp01(minX + 0.05f);
-            if (minY >= maxY)
-                maxY = Clamp01(minY + 0.05f);
-
-            configData.UiAnchorMin = ToAnchorString(minX, minY);
-            configData.UiAnchorMax = ToAnchorString(maxX, maxY);
-            SaveConfig(configData);
-
-            if (player != null)
-            {
-                DestroyWipeTimerUI(player);
-                if (notifyPlayer)
-                {
-                    SendReply(player, Msg("Config.UIAdd.Set", player.UserIDString,
-                        dx, dy, minX, minY, maxX, maxY));
-                    SendReply(player, "Reopen a Tool Cupboard to see the new UI position.");
-                }
-            }
         }
 
-        private void ResetUiAnchors(BasePlayer player, bool notifyPlayer)
+        private void ApplyUiOffset(float dx, float dy)
         {
-            configData.UiAnchorMin = "0.4 0.92";
-            configData.UiAnchorMax = "0.6 0.98";
-            SaveConfig(configData);
+            float minX, minY, maxX, maxY;
+            GetCurrentAnchors(out minX, out minY, out maxX, out maxY);
 
-            if (player != null)
-            {
-                DestroyWipeTimerUI(player);
-                if (notifyPlayer)
-                {
-                    SendReply(player, Msg("Config.UIReset.Set", player.UserIDString));
-                }
-            }
-            else
-            {
-                Puts("ModernNoCupboardDecay: UI anchors reset to default.");
-            }
+            minX = Mathf.Clamp01(minX + dx);
+            maxX = Mathf.Clamp01(maxX + dx);
+            minY = Mathf.Clamp01(minY + dy);
+            maxY = Mathf.Clamp01(maxY + dy);
+
+            if (minX >= maxX) maxX = Mathf.Clamp01(minX + 0.05f);
+            if (minY >= maxY) maxY = Mathf.Clamp01(minY + 0.05f);
+
+            SetUiAnchors(minX, minY, maxX, maxY);
         }
 
-        // ----------------------
-        //  Debug Overlay Commands
-        // ----------------------
+        private void ResetUiAnchors()
+        {
+            _config.UiAnchorMin = "0.4 0.92";
+            _config.UiAnchorMax = "0.6 0.98";
+            SaveConfig(_config);
+        }
+
+        #endregion
+
+        #region Debug Overlay
 
         [ChatCommand("mncddebug")]
-        private void ChatCommandMncdDebug(BasePlayer player, string command, string[] args)
+        private void CmdDebugChat(BasePlayer player, string command, string[] args)
         {
-            if (player == null)
-                return;
+            if (player == null) return;
 
             if (!HasDebugPerm(player))
             {
@@ -1425,12 +1215,12 @@ namespace Oxide.Plugins
         }
 
         [ConsoleCommand("mncd.debug")]
-        private void ConsoleCommandMncdDebug(ConsoleSystem.Arg arg)
+        private void CmdDebugConsole(ConsoleSystem.Arg arg)
         {
             var player = arg?.Player();
             if (player == null)
             {
-                Puts("mncd.debug can only be used in-game by a player.");
+                Puts("mncd.debug can only be used in-game.");
                 return;
             }
 
@@ -1446,7 +1236,7 @@ namespace Oxide.Plugins
         private void ToggleDebugOverlay(BasePlayer player)
         {
             ulong id = player.userID;
-            if (debugOverlayUsers.Contains(id))
+            if (_debugUsers.Contains(id))
             {
                 DisableDebugOverlay(player);
                 SendReply(player, Msg("Debug.Disabled", player.UserIDString));
@@ -1461,15 +1251,12 @@ namespace Oxide.Plugins
         private void EnableDebugOverlay(BasePlayer player)
         {
             ulong id = player.userID;
+            _debugUsers.Add(id);
 
-            debugOverlayUsers.Add(id);
+            if (_debugTimers.TryGetValue(id, out var existing))
+                existing?.Destroy();
 
-            if (debugOverlayTimers.TryGetValue(id, out var existing))
-            {
-                existing.Destroy();
-            }
-
-            debugOverlayTimers[id] = timer.Every(0.5f, () =>
+            _debugTimers[id] = timer.Every(0.5f, () =>
             {
                 if (player == null || !player.IsConnected || player.IsDead())
                 {
@@ -1483,54 +1270,45 @@ namespace Oxide.Plugins
 
         private void DisableDebugOverlay(BasePlayer player)
         {
-            if (player == null)
-                return;
+            if (player == null) return;
 
             ulong id = player.userID;
+            _debugUsers.Remove(id);
 
-            debugOverlayUsers.Remove(id);
-
-            if (debugOverlayTimers.TryGetValue(id, out var t))
+            if (_debugTimers.TryGetValue(id, out var t))
             {
-                t.Destroy();
-                debugOverlayTimers.Remove(id);
+                t?.Destroy();
+                _debugTimers.Remove(id);
             }
 
-            DestroyDebugOverlayUI(player);
+            CuiHelper.DestroyUi(player, UiDebug);
         }
 
         private void UpdateDebugOverlayUI(BasePlayer player)
         {
-            if (player == null || !player.IsConnected)
-                return;
+            if (player == null || !player.IsConnected) return;
 
-            bool isProtected = IsPlayerInProtectedZone(player);
-            string text = isProtected ? Msg("Debug.UI.Protected", player.UserIDString) : Msg("Debug.UI.NotProtected", player.UserIDString);
+            bool isProtected = IsPositionProtected(player.transform.position, player.userID);
+            string text = isProtected
+                ? Msg("Debug.UI.Protected", player.UserIDString)
+                : Msg("Debug.UI.NotProtected", player.UserIDString);
 
             var container = new CuiElementContainer();
 
-            var panel = new CuiElement
+            container.Add(new CuiElement
             {
-                Name = DebugUiName,
+                Name = UiDebug,
                 Parent = "Overlay",
                 Components =
                 {
-                    new CuiImageComponent
-                    {
-                        Color = "0 0 0 0.4"
-                    },
-                    new CuiRectTransformComponent
-                    {
-                        AnchorMin = "0.4 0.96",
-                        AnchorMax = "0.6 0.99"
-                    }
+                    new CuiImageComponent { Color = "0 0 0 0.4" },
+                    new CuiRectTransformComponent { AnchorMin = "0.4 0.96", AnchorMax = "0.6 0.99" }
                 }
-            };
-            container.Add(panel);
+            });
 
             container.Add(new CuiElement
             {
-                Parent = DebugUiName,
+                Parent = UiDebug,
                 Components =
                 {
                     new CuiTextComponent
@@ -1540,35 +1318,22 @@ namespace Oxide.Plugins
                         Align = TextAnchor.MiddleCenter,
                         Color = "1 1 1 1"
                     },
-                    new CuiRectTransformComponent
-                    {
-                        AnchorMin = "0 0",
-                        AnchorMax = "1 1"
-                    }
+                    new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1" }
                 }
             });
 
-            DestroyDebugOverlayUI(player);
+            CuiHelper.DestroyUi(player, UiDebug);
             CuiHelper.AddUi(player, container);
         }
 
-        private void DestroyDebugOverlayUI(BasePlayer player)
-        {
-            if (player == null)
-                return;
+        #endregion
 
-            CuiHelper.DestroyUi(player, DebugUiName);
-        }
-
-        // ----------------------
-        //  TC Preview (ddraw sphere)
-        // ----------------------
+        #region TC Preview
 
         [ChatCommand("mncdpreview")]
-        private void ChatCommandMncdPreview(BasePlayer player, string command, string[] args)
+        private void CmdPreviewChat(BasePlayer player, string command, string[] args)
         {
-            if (player == null)
-                return;
+            if (player == null) return;
 
             if (!HasPreviewPerm(player))
             {
@@ -1580,12 +1345,12 @@ namespace Oxide.Plugins
         }
 
         [ConsoleCommand("mncd.preview")]
-        private void ConsoleCommandMncdPreview(ConsoleSystem.Arg arg)
+        private void CmdPreviewConsole(ConsoleSystem.Arg arg)
         {
             var player = arg?.Player();
             if (player == null)
             {
-                Puts("mncd.preview can only be used in-game by a player.");
+                Puts("mncd.preview can only be used in-game.");
                 return;
             }
 
@@ -1600,122 +1365,96 @@ namespace Oxide.Plugins
 
         private void DrawTcPreview(BasePlayer player)
         {
-            float radius = configData.EntityRadius * Mathf.Max(0.1f, configData.PreviewRingRadiusMultiplier);
-            float duration = Mathf.Max(1f, configData.PreviewRingDuration);
+            float radius = _config.EntityRadius * Mathf.Max(0.1f, _config.PreviewRingRadiusMultiplier);
+            float duration = _config.PreviewRingDuration;
+            int tcCount = 0;
 
-            var tcs = BaseNetworkable.serverEntities
-                .OfType<BuildingPrivlidge>()
-                .ToList();
+            // Manual iteration avoids LINQ .OfType<>().ToList() allocation
+            foreach (var entity in BaseNetworkable.serverEntities)
+            {
+                var tc = entity as BuildingPrivlidge;
+                if (tc == null) continue;
 
-            if (tcs.Count == 0)
+                var pos = tc.transform.position;
+                player.SendConsoleCommand("ddraw.sphere", duration, 0f, 1f, 0f, 1f, pos.x, pos.y, pos.z, radius);
+                tcCount++;
+            }
+
+            if (tcCount == 0)
             {
                 SendReply(player, Msg("Preview.NoTC", player.UserIDString));
                 return;
             }
 
-            foreach (var tc in tcs)
-            {
-                var pos = tc.transform.position;
-                player.SendConsoleCommand("ddraw.sphere",
-                    duration,
-                    0f, 1f, 0f, 1f,
-                    pos.x, pos.y, pos.z,
-                    radius);
-            }
-
-            SendReply(player, Msg("Preview.Drawn", player.UserIDString, tcs.Count, duration, radius));
+            SendReply(player, Msg("Preview.Drawn", player.UserIDString, tcCount, duration, radius));
         }
 
-        // ----------------------
-        //  TC Loot Hook + Wipe UI
-        // ----------------------
+        #endregion
+
+        #region TC Loot Hooks & Wipe UI
 
         private void OnLootEntity(BasePlayer player, BaseEntity entity)
         {
-            if (player == null || entity == null)
-                return;
-
-            var priv = entity as BuildingPrivlidge;
-            if (priv == null)
-                return;
+            if (player == null || entity == null) return;
+            if (!(entity is BuildingPrivlidge)) return;
 
             DestroyWipeTimerUI(player);
 
-            if (!configData.EnableTcWipeUI)
+            string modeStr = GetWipeModeDisplayString();
+            var remaining = GetWipeTimeRemaining();
+
+            if (!_config.EnableTcWipeUI)
             {
-                var remaining = GetWipeTimeRemaining();
-                string wipeModeStr = currentWipeMode.ToString();
-                var userId = player.UserIDString;
-
-                if (currentWipeMode == WipeMode.CustomDays && configData.CustomWipeDays > 0)
-                    wipeModeStr += $" ({configData.CustomWipeDays}d)";
-
+                string userId = player.UserIDString;
                 if (remaining == null)
-                    SendReply(player, Msg("TcLoot.NoRemaining", userId, wipeModeStr));
+                    SendReply(player, Msg("TcLoot.NoRemaining", userId, modeStr));
                 else
-                    SendReply(player, Msg("TcLoot.WithRemaining", userId, wipeModeStr, FormatTimeSpan(remaining.Value)));
-
+                    SendReply(player, Msg("TcLoot.WithRemaining", userId, modeStr, FormatTimeSpan(remaining.Value)));
                 return;
             }
 
-            var wipeRemaining = GetWipeTimeRemaining();
-            string mode = currentWipeMode.ToString();
-            if (currentWipeMode == WipeMode.CustomDays && configData.CustomWipeDays > 0)
-                mode += $" ({configData.CustomWipeDays}d)";
-
-            string remainText = wipeRemaining != null ? FormatTimeSpan(wipeRemaining.Value) : "N/A";
-
-            ShowWipeTimerUI(player, mode, remainText);
+            string remainText = remaining != null ? FormatTimeSpan(remaining.Value) : "N/A";
+            ShowWipeTimerUI(player, modeStr, remainText);
         }
 
         private void OnLootEntityEnd(BasePlayer player, BaseEntity entity)
         {
-            if (player == null)
-                return;
-
-            DestroyWipeTimerUI(player);
+            if (player != null)
+                DestroyWipeTimerUI(player);
         }
 
         private void OnPlayerDisconnected(BasePlayer player, string reason)
         {
-            if (player == null)
-                return;
-
+            if (player == null) return;
             DestroyWipeTimerUI(player);
             DisableDebugOverlay(player);
         }
 
         private void ShowWipeTimerUI(BasePlayer player, string wipeMode, string remaining)
         {
-            if (player == null)
-                return;
+            if (player == null) return;
 
             var userId = player.UserIDString;
-
             var container = new CuiElementContainer();
-
-            var panel = new CuiElement
-            {
-                Name = WipeUiName,
-                Parent = "Overlay",
-                Components =
-                {
-                    new CuiImageComponent
-                    {
-                        Color = configData.UiBackgroundColor
-                    },
-                    new CuiRectTransformComponent
-                    {
-                        AnchorMin = configData.UiAnchorMin,
-                        AnchorMax = configData.UiAnchorMax
-                    }
-                }
-            };
-            container.Add(panel);
 
             container.Add(new CuiElement
             {
-                Parent = WipeUiName,
+                Name = UiWipe,
+                Parent = "Overlay",
+                Components =
+                {
+                    new CuiImageComponent { Color = _config.UiBackgroundColor },
+                    new CuiRectTransformComponent
+                    {
+                        AnchorMin = _config.UiAnchorMin,
+                        AnchorMax = _config.UiAnchorMax
+                    }
+                }
+            });
+
+            container.Add(new CuiElement
+            {
+                Parent = UiWipe,
                 Components =
                 {
                     new CuiTextComponent
@@ -1723,19 +1462,15 @@ namespace Oxide.Plugins
                         Text = Msg("UI.WipeTitle", userId),
                         FontSize = 14,
                         Align = TextAnchor.UpperCenter,
-                        Color = configData.UiTextColor
+                        Color = _config.UiTextColor
                     },
-                    new CuiRectTransformComponent
-                    {
-                        AnchorMin = "0.05 0.5",
-                        AnchorMax = "0.95 0.95"
-                    }
+                    new CuiRectTransformComponent { AnchorMin = "0.05 0.5", AnchorMax = "0.95 0.95" }
                 }
             });
 
             container.Add(new CuiElement
             {
-                Parent = WipeUiName,
+                Parent = UiWipe,
                 Components =
                 {
                     new CuiTextComponent
@@ -1743,19 +1478,15 @@ namespace Oxide.Plugins
                         Text = Msg("UI.WipeLine", userId, wipeMode, remaining),
                         FontSize = 12,
                         Align = TextAnchor.MiddleCenter,
-                        Color = configData.UiTextColor
+                        Color = _config.UiTextColor
                     },
-                    new CuiRectTransformComponent
-                    {
-                        AnchorMin = "0.05 0.15",
-                        AnchorMax = "0.95 0.5"
-                    }
+                    new CuiRectTransformComponent { AnchorMin = "0.05 0.15", AnchorMax = "0.95 0.5" }
                 }
             });
 
             container.Add(new CuiElement
             {
-                Parent = WipeUiName,
+                Parent = UiWipe,
                 Components =
                 {
                     new CuiTextComponent
@@ -1763,13 +1494,9 @@ namespace Oxide.Plugins
                         Text = Msg("UI.WipeExtra", userId),
                         FontSize = 11,
                         Align = TextAnchor.LowerCenter,
-                        Color = configData.UiTextColor
+                        Color = _config.UiTextColor
                     },
-                    new CuiRectTransformComponent
-                    {
-                        AnchorMin = "0.05 0.02",
-                        AnchorMax = "0.95 0.2"
-                    }
+                    new CuiRectTransformComponent { AnchorMin = "0.05 0.02", AnchorMax = "0.95 0.2" }
                 }
             });
 
@@ -1778,10 +1505,10 @@ namespace Oxide.Plugins
 
         private void DestroyWipeTimerUI(BasePlayer player)
         {
-            if (player == null)
-                return;
-
-            CuiHelper.DestroyUi(player, WipeUiName);
+            if (player != null)
+                CuiHelper.DestroyUi(player, UiWipe);
         }
+
+        #endregion
     }
 }

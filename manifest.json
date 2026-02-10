@@ -1,9 +1,9 @@
 {
   "name": "ModernNoCupboardDecay",
   "title": "Modern No Cupboard Decay",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "author": "Gabriel",
-  "description": "A modern full-featured Rust plugin that disables decay within Tool Cupboard radius, supports team-aware authorization, wipe-aware UI, draggable UI positioning, debug overlays, TC preview holograms, automatic wipe detection, and multilingual support.",
+  "description": "Prevents decay within Tool Cupboard radius. Wipe-aware UI, team-aware auth, debug tools, TC preview holograms, multilingual support. Oxide v2.0.7022+ / Naval Update compatible.",
   "language": "C#",
   "game": "rust",
   "modloader": "oxide",

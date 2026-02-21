@@ -1,8 +1,7 @@
 {
   "Status.Report": "[{0}] v{1} | 状态: {2} | 半径: {3} | CheckAuth: {4} | TeamAware: {5} | AutoDetect: {6} | WipeMode: {7} (Override: {8}) | 距离下次清档: {9} | 信息: {10}",
-
   "Error.NoPermission": "[MNCD] 你没有权限修改此插件的设置。",
-  "Error.NoDebugPermission": "[MNCD] 你没有权限使用调试覆盖界面 (debug overlay)。",
+  "Error.NoDebugPermission": "[MNCD] 你没有权限使用调试覆盖界面。",
   "Error.ConfigOption": "[MNCD] 未知选项。可用选项: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow。",
   "Error.ConfigApply": "[MNCD] 应用 '{0}' 时出错: {1}",
   "Error.CheckAuthValue": "[MNCD] checkauth 必须是 true/false。",
@@ -11,14 +10,13 @@
   "Error.RadiusValue": "[MNCD] radius 需要一个大于 0 的数字 (单位: 米)。",
   "Error.WipeModeValue": "[MNCD] wipemode 必须是: Manual, Weekly, BiWeekly, Monthly，或形如 5d 的天数。",
   "Error.BoolExpected": "[MNCD] {0} 必须是 true/false。",
-
+  "Preview.Cooldown": "[MNCD] 请再等待 {0} 秒后再使用 /mncdpreview。",
   "Usage.MncdSet.Chat": "[MNCD] 用法: /mncdset <选项> <值>。选项: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow。",
   "Usage.MncdSet.Console": "[MNCD] 用法: mncd.set <选项> <值>。选项: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow。",
   "Usage.UIAdd.Chat": "[MNCD] 用法: /mncduiadd <deltaX> <deltaY> (0..1 的偏移量)。",
   "Usage.UIAdd.Console": "[MNCD] 用法: mncd.uiadd <deltaX> <deltaY> (0..1 的偏移量)。",
   "Usage.UIReset.Chat": "[MNCD] 用法: /mncdresetui (重置 UI 面板到默认位置)。",
   "Usage.UIReset.Console": "[MNCD] 用法: mncd.resetui (重置 UI 面板到默认位置)。",
-
   "Config.CheckAuth.Set": "[MNCD] CheckAuth 现在为 {0}。",
   "Config.TeamAware.Set": "[MNCD] TeamAwareProtection 现在为 {0}。",
   "Config.Radius.Set": "[MNCD] EntityRadius (TC 防腐蚀范围) 现在为 {0} 米。",
@@ -26,45 +24,31 @@
   "Config.WipeMode.Set": "[MNCD] WipeModeOverride 设置为 '{0}'。当前 WipeMode: {1}，已关闭 AutoDetect。",
   "Config.WipeStartNow.Set": "[MNCD] WipeStartUnixTime 已重置为当前时间。WipeMode: {0}。剩余时间: {1}。",
   "Config.UIReset.Set": "[MNCD] UI 锚点已重置为默认值。重新打开工具柜(TC)即可看到新位置。",
-  "Config.UIAdd.Set": "[MNCD] UI 锚点已偏移 Δ({0}, {1})。新的 Min({2}, {3}) Max({4}, {5})。",
-
+  "Config.UIAdd.Set": "[MNCD] UI 锚点已偏移 ({0}, {1})。新的 Min({2}, {3}) Max({4}, {5})。",
   "TcLoot.NoRemaining": "[MNCD] 此 TC 范围内的建筑完全由 ModernNoCupboardDecay 保护，不会腐蚀。\n清档计划: {0}。未计算结束时间 (手动或缺少数据)。",
   "TcLoot.WithRemaining": "[MNCD] 此 TC 范围内的建筑完全由 ModernNoCupboardDecay 保护，不会腐蚀。\n清档计划: {0}。距离清档还有: {1}。",
-
   "UI.WipeTitle": "ModernNoCupboardDecay",
-  "UI.WipeLine": "清档模式: {0} – 剩余 {1}",
+  "UI.WipeLine": "清档模式: {0} - 剩余 {1}",
   "UI.WipeExtra": "在此工具柜(TC)半径内，腐蚀 (decay) 已被禁用。",
-
   "UIAnchor.Usage.Chat": "[MNCD] 用法: /mncdui <minX> <minY> <maxX> <maxY>",
   "UIAnchor.Usage.Console": "[MNCD] 用法: mncd.ui <minX> <minY> <maxX> <maxY>",
   "UIAnchor.Set": "[MNCD] UI 锚点已设置为: Min({0}, {1})  Max({2}, {3})",
   "UIAnchor.Error.Numeric": "[MNCD] 4 个值都必须是数字。",
   "UIAnchor.Error.Order": "[MNCD] 必须满足 minX < maxX 且 minY < maxY。",
-
   "Debug.Enabled": "[MNCD] 调试覆盖界面已开启。它会显示你当前是否在 MNCD 保护范围内。",
   "Debug.Disabled": "[MNCD] 调试覆盖界面已关闭。",
   "Debug.UI.Protected": "MNCD: 受保护",
   "Debug.UI.NotProtected": "MNCD: 未受保护",
-
   "Preview.NoTC": "[MNCD] 附近没有发现工具柜(TC)，无法预览。",
   "Preview.Drawn": "[MNCD] 正在为 {0} 个工具柜绘制保护球体，持续 {1} 秒 (半径 {2} 米)。",
   "Preview.NoPerm": "[MNCD] 你没有使用 /mncdpreview 的权限。",
-
   "Help.Header": "[MNCD] ModernNoCupboardDecay v{0}",
-
-  "Help.General": "ModernNoCupboardDecay 会在工具柜(TC)范围内关闭建筑腐蚀，并显示清档 (wipe) 信息。\n常用命令:\n  /mncd               - 显示插件状态。\n  /mncdhelp [主题]    - 显示帮助。主题: basic, ui, set, debug, preview, wipe。\n  /mncdpreview        - 绘制 TC 保护范围的“全息圈”。\n  /mncddebug          - 打开/关闭个人保护状态调试界面。\n管理员命令:\n  /mncdset            - 在线修改配置 (半径、授权、清档模式等)。\n  /mncdui, /mncduiadd - 调整清档 UI 面板的位置。\n  /mncdresetui        - 重置 UI 位置。\n使用 '/mncdhelp <主题>' 查看详细说明。例如: /mncdhelp preview",
-
+  "Help.General": "ModernNoCupboardDecay 会在工具柜(TC)范围内关闭建筑腐蚀，并显示清档 (wipe) 信息。\n常用命令:\n  /mncd               - 显示插件状态。\n  /mncdhelp [主题]    - 显示帮助。主题: basic, ui, set, debug, preview, wipe。\n  /mncdpreview        - 绘制 TC 保护范围的全息圈。\n  /mncddebug          - 打开/关闭个人保护状态调试界面。\n管理员命令:\n  /mncdset            - 在线修改配置 (半径、授权、清档模式等)。\n  /mncdui, /mncduiadd - 调整清档 UI 面板的位置。\n  /mncdresetui        - 重置 UI 位置。\n使用 '/mncdhelp <主题>' 查看详细说明。例如: /mncdhelp preview",
   "Help.UnknownTopic": "[MNCD] 未知的帮助主题 '{0}'。可用主题: basic, ui, set, debug, preview, wipe。",
-
-  "Help.Topic.basic": "MNCD 基本说明:\n• 所有位于工具柜(TC)设定半径内的建筑实体都不会腐蚀。\n• 可选 CheckAuth: 只保护属于 TC 授权玩家 (或其队伍) 的实体。\n• TeamAwareProtection: 开启后，TC 拥有者及其团队成员、授权者的队友也受保护。\n• TC 的“维护剩余时间”会在 MNCD UI 中被替换为“距离清档剩余时间”。\n实用命令:\n  /mncd           - 显示当前半径、清档模式和状态。\n  /mncddebug      - 查看你自己是否处于保护范围内。",
-
-  "Help.Topic.ui": "UI 位置调整:\n  /mncdui <minX> <minY> <maxX> <maxY>\n    • 设置清档 UI 面板锚点 (屏幕归一化坐标 0..1)。\n    • 示例: /mncdui 0.70 0.27 0.95 0.49\n  /mncduiadd <dx> <dy>\n    • 轻微移动 UI 面板。\n    • 示例: /mncduiadd -0.02 0.10 表示左移 2%，上移 10%。\n  /mncdresetui\n    • 将 UI 重置到默认顶部居中位置。\n说明:\n  • 需要管理员或 'modernnocupboarddecay.admin' 权限。\n  • 修改后重新打开 TC 即可刷新 UI 面板。",
-
-  "Help.Topic.set": "在线配置: /mncdset 与 mncd.set\n\n聊天 (管理员):\n  /mncdset <选项> <值>\n控制台/RCON:\n  mncd.set <选项> <值>\n\n选项:\n  checkauth <true|false>\n    • true  => 只有 TC 授权玩家 (以及可选团队) 的建筑被保护。\n    • false => TC 附近的任何建筑都被保护。\n  teamaware <true|false>\n    • 当 checkauth 为 true 时，同时保护 TC 拥有者/授权者的 Rust 队友。\n  radius <米>\n    • 设置 TC 保护半径。例如: /mncdset radius 30\n  autodetect <true|false>\n    • true  => 从 server.tags 中自动检测清档周期 (weekly, monthly, 5d 等)。\n    • false => 使用 WipeModeOverride。\n  wipemode <Manual|Weekly|BiWeekly|Monthly|Nd>\n    • 示例: /mncdset wipemode 5d (每 5 天清档)。\n  wipestartnow\n    • 重置清档开始时间为当前。更改周期后可使用此命令。\n",
-
-  "Help.Topic.debug": "调试覆盖界面: /mncddebug 与 mncd.debug\n\n  /mncddebug\n    • 打开/关闭屏幕顶部的小文本提示:\n      'MNCD: 受保护'   => 你在 TC 保护半径内。\n      'MNCD: 未受保护' => 你不在保护范围内。\n  mncd.debug (控制台)\n    • 效果相同，只是从 F1 控制台执行。\n\n说明:\n  • 需要管理员或 'modernnocupboarddecay.debug' 权限。\n  • 每 0.5 秒自动更新状态。\n  • 玩家下线时会自动关闭并清理。",
-
-  "Help.Topic.preview": "TC 预览圈: /mncdpreview 与 mncd.preview\n\n  /mncdpreview\n    • 在所有工具柜(TC)周围绘制“全息”球体/圈，显示保护半径。\n    • 使用配置中的 EntityRadius (可由 PreviewRingRadiusMultiplier 放大/缩小)。\n    • 只有你自己能看到这些圈，它们是客户端 ddraw 效果。\n\n  mncd.preview (控制台)\n    • 在 F1 控制台中执行，效果相同。\n\n配置:\n  PreviewRequiresPermission\n    • false (默认) => 所有玩家都可以使用 /mncdpreview。\n    • true         => 需要 'modernnocupboarddecay.preview' 权限或管理员。\n  PreviewRingDuration\n    • 圈显示的时间 (秒)。\n  PreviewRingRadiusMultiplier\n    • 只对可视圈的半径进行倍率调整，不影响实际保护范围。\n",
-
-  "Help.Topic.wipe": "清档 (wipe) 模式与计时:\n\n检测方式:\n  • AutoDetectWipeFromTags = true:\n    - 从 ConVar.Server.tags 中读取 weekly, biweekly, monthly 等关键字。\n    - 也支持 '5d', '5day', '5days' 这类格式来表示自定义 N 天清档。\n  • AutoDetectWipeFromTags = false:\n    - 使用配置里的 WipeModeOverride 或 /mncdset wipemode 指定的模式。\n\n支持的模式:\n  Manual      => 不计算结束时间 (手动管理)。\n  Weekly      => 每 7 天清档一次。\n  BiWeekly    => 每 14 天清档一次。\n  Monthly     => 固定 30 天清档一次。\n  Nd (自定义) => 如 '5d' 表示每 5 天一次。\n\n清档开始时间:\n  • OnNewSave (新地图/重置) 时自动设置 WipeStartUnixTime。\n  • /mncdset wipestartnow 可手动重置开始时间。\n\nTC UI:\n  • 当你打开 TC 时，MNCD 会显示 'Wipe: <模式> – <剩余时间>'。\n  • 如果模式为 Manual 或无法计算剩余时间，则显示 N/A。"
+  "Help.Topic.basic": "MNCD 基本说明:\n- 所有位于工具柜(TC)设定半径内的建筑实体都不会腐蚀。\n- 可选 CheckAuth: 只保护属于 TC 授权玩家 (或其队伍) 的实体。\n- TeamAwareProtection: 开启后，TC 拥有者及其团队成员、授权者的队友也受保护。\n- TC 的维护剩余时间会在 MNCD UI 中被替换为距离清档剩余时间。\n实用命令:\n  /mncd           - 显示当前半径、清档模式和状态。\n  /mncddebug      - 查看你自己是否处于保护范围内。",
+  "Help.Topic.ui": "UI 位置调整:\n  /mncdui <minX> <minY> <maxX> <maxY>\n    - 设置清档 UI 面板锚点 (屏幕归一化坐标 0..1)。\n    - 示例: /mncdui 0.70 0.27 0.95 0.49\n  /mncduiadd <dx> <dy>\n    - 轻微移动 UI 面板。\n    - 示例: /mncduiadd -0.02 0.10 表示左移 2%，上移 10%。\n  /mncdresetui\n    - 将 UI 重置到默认顶部居中位置。\n说明:\n  - 需要管理员或 'modernnocupboarddecay.admin' 权限。\n  - 修改后重新打开 TC 即可刷新 UI 面板。",
+  "Help.Topic.set": "在线配置: /mncdset 与 mncd.set\n\n聊天 (管理员):\n  /mncdset <选项> <值>\n控制台/RCON:\n  mncd.set <选项> <值>\n\n选项:\n  checkauth <true|false>\n    - true  => 只有 TC 授权玩家 (以及可选团队) 的建筑被保护。\n    - false => TC 附近的任何建筑都被保护。\n  teamaware <true|false>\n    - 当 checkauth 为 true 时，同时保护 TC 拥有者/授权者的 Rust 队友。\n  radius <米>\n    - 设置 TC 保护半径。例如: /mncdset radius 30\n  autodetect <true|false>\n    - true  => 从 server.tags 中自动检测清档周期 (weekly, monthly, 5d 等)。\n    - false => 使用 WipeModeOverride。\n  wipemode <Manual|Weekly|BiWeekly|Monthly|Nd>\n    - 示例: /mncdset wipemode 5d (每 5 天清档)。\n  wipestartnow\n    - 重置清档开始时间为当前。更改周期后可使用此命令。",
+  "Help.Topic.debug": "调试覆盖界面: /mncddebug 与 mncd.debug\n\n  /mncddebug\n    - 打开/关闭屏幕顶部的小文本提示:\n      'MNCD: 受保护'   => 你在 TC 保护半径内。\n      'MNCD: 未受保护' => 你不在保护范围内。\n  mncd.debug (控制台)\n    - 效果相同，只是从 F1 控制台执行。\n\n说明:\n  - 需要管理员或 'modernnocupboarddecay.debug' 权限。\n  - 每 0.5 秒自动更新状态。\n  - 玩家下线时会自动关闭并清理。",
+  "Help.Topic.preview": "TC 预览圈: /mncdpreview 与 mncd.preview\n\n  /mncdpreview\n    - 在所有工具柜(TC)周围绘制全息球体，显示保护半径。\n    - 使用配置中的 EntityRadius (可由 PreviewRingRadiusMultiplier 放大/缩小)。\n    - 只有你自己能看到这些圈，它们是客户端 ddraw 效果。\n\n  mncd.preview (控制台)\n    - 在 F1 控制台中执行，效果相同。\n\n配置:\n  PreviewRequiresPermission\n    - false (默认) => 所有玩家都可以使用 /mncdpreview。\n    - true         => 需要 'modernnocupboarddecay.preview' 权限或管理员。\n  PreviewRingDuration\n    - 圈显示的时间 (秒)。\n  PreviewRingRadiusMultiplier\n    - 只对可视圈的半径进行倍率调整，不影响实际保护范围。",
+  "Help.Topic.wipe": "清档 (wipe) 模式与计时:\n\n检测方式:\n  - AutoDetectWipeFromTags = true:\n    - 从 ConVar.Server.tags 中读取 weekly, biweekly, monthly 等关键字。\n    - 也支持 '5d', '5day', '5days' 这类格式来表示自定义 N 天清档。\n  - AutoDetectWipeFromTags = false:\n    - 使用配置里的 WipeModeOverride 或 /mncdset wipemode 指定的模式。\n\n支持的模式:\n  Manual      => 不计算结束时间 (手动管理)。\n  Weekly      => 每 7 天清档一次。\n  BiWeekly    => 每 14 天清档一次。\n  Monthly     => 固定 30 天清档一次。\n  Nd (自定义) => 如 '5d' 表示每 5 天一次。\n\n清档开始时间:\n  - OnNewSave (新地图/重置) 时自动设置 WipeStartUnixTime。\n  - /mncdset wipestartnow 可手动重置开始时间。\n\nTC UI:\n  - 当你打开 TC 时，MNCD 会显示 'Wipe: <模式> - <剩余时间>'。\n  - 如果模式为 Manual 或无法计算剩余时间，则显示 N/A。"
 }

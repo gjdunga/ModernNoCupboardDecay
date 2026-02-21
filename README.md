@@ -1,4 +1,4 @@
-# ModernNoCupboardDecay v5.2.0 — Administrator Guide
+# ModernNoCupboardDecay v5.3.0 — Administrator Guide
 
 Prevents decay for all building blocks and deployables within any Tool Cupboard
 radius.  Includes wipe-timer UI, team-aware auth, debug overlay, TC preview
@@ -37,7 +37,7 @@ Requires Oxide / uMod 2.0.7022+  |  Compatible with the Rust Naval Update.
 |---|---|---|
 | `checkauth` | true/false | Require TC authorization to protect entities. |
 | `teamaware` | true/false | Protect Rust-team members of authed players (needs checkauth). |
-| `radius` | 1–500 | TC protection bubble radius in meters. |
+| `radius` | 1-500 | TC protection bubble radius in meters. |
 | `autodetect` | true/false | Read wipe schedule from server.tags automatically. |
 | `wipemode` | Manual/Weekly/BiWeekly/Monthly/Nd | Set wipe schedule (e.g. `5d`). |
 | `wipestartnow` | — | Reset wipe start timestamp to now. |
@@ -48,7 +48,7 @@ All RCON changes are logged to the server console for auditability.
 ### UI positioning (admin)
 
 ```
-/mncdui <minX> <minY> <maxX> <maxY>   Set panel anchors (normalized 0–1).
+/mncdui <minX> <minY> <maxX> <maxY>   Set panel anchors (normalized 0-1).
 /mncduiadd <dx> <dy>                  Nudge panel position.
 /mncdresetui                          Reset to default top-center position.
 ```
@@ -83,7 +83,7 @@ Automatically stops and cleans up on disconnect.
 |---|---|---|
 | `CheckAuth` | false | Auth-mode protection. |
 | `TeamAwareProtection` | true | Extend auth-mode to Rust team members. |
-| `EntityRadius` | 30 | TC bubble radius (meters, 1–500). |
+| `EntityRadius` | 30 | TC bubble radius (meters, 1-500). |
 | `AutoDetectWipeFromTags` | true | Detect wipe schedule from server.tags. |
 | `WipeModeOverride` | "Manual" | Fallback wipe mode. |
 | `CustomWipeDays` | 0 | Days for custom wipe mode. |
@@ -103,10 +103,11 @@ Automatically stops and cleans up on disconnect.
 ## Language files
 
 ```
-oxide/lang/en/ModernNoCupboardDecay.json
-oxide/lang/es/ModernNoCupboardDecay.json
-oxide/lang/ru/ModernNoCupboardDecay.json
-oxide/lang/zh-CN/ModernNoCupboardDecay.json
+oxide/lang/en/ModernNoCupboardDecay.json      (English)
+oxide/lang/es/ModernNoCupboardDecay.json      (Spanish)
+oxide/lang/ru/ModernNoCupboardDecay.json      (Russian)
+oxide/lang/zh-CN/ModernNoCupboardDecay.json   (Simplified Chinese)
+oxide/lang/la/ModernNoCupboardDecay.json      (Latin)
 ```
 
 ---

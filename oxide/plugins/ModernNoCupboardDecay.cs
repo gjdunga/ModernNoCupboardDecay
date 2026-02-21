@@ -1,5 +1,5 @@
 // ============================================================================
-// ModernNoCupboardDecay  v5.2.0
+// ModernNoCupboardDecay  v5.3.0
 // Author  : Gabriel (gjdunga)
 // License : MIT  –  see LICENSE.MD
 //
@@ -28,52 +28,30 @@
 //   Oxide / uMod  2.0.7022+
 //   Rust Naval Update  (ProtoBuf.PlayerNameID.userid auth list)
 //
-// Security notes (v5.1.0 / v5.2.0)
-// --------------------------------
-//   C1  HitBuffer is now an instance field.  The static field was shared
-//       across all concurrent Physics.OverlapSphereNonAlloc calls; under
-//       Oxide's timer + hook execution model, two overlapping calls would
-//       corrupt each other's result counts.
+// Value-tuple policy
+// ------------------
+//   No C# value tuples ((T1, T2, ...) syntax) are used anywhere in this file.
+//   Every multi-value return uses a named private class or out-parameters so
+//   uMod's build server (which strips ValueTuple shims) can compile cleanly.
 //
-//   C2  mncd.set from RCON / server console runs without a BasePlayer.
-//       The permission gate is intentionally skipped in that case because
-//       RCON access implies server-operator trust; this is now documented
-//       with explicit logging so the action is auditable.
+// Security change log (full history in CHANGELOG.md)
+// ---------------------------------------------------
+//   v5.3.0
+//     S1  OnLootEntity now guards _initialized / _config == null before any
+//         wipe-mode or remaining-time access, matching the same defensive
+//         pattern already in OnEntityTakeDamage.
+//     S2  GetWipeModeDisplayString guards _config == null so a CustomDays
+//         lookup cannot throw a NullReferenceException if called before
+//         OnServerInitialized completes.
+//     S3  Preview.Cooldown localisation key was registered in
+//         LoadDefaultMessages but absent from all four shipped lang JSON
+//         files.  Added to en, es, ru, zh-CN, and new la.
+//     S4  Stale lang file at oxide/lang/ModernNoCupboardDecay.en.json
+//         (wrong path, shadowed the correct per-locale directory) removed.
+//     S5  Sample config moved from oxide/oxide/config/ (doubly-nested path)
+//         to oxide/config/ (correct Oxide layout).
 //
-//   C3  /mncdpreview iterates every entity in serverEntities.  A per-player
-//       cooldown (PreviewCooldownSeconds, default 15 s) prevents repeated
-//       full-server scans from unprivileged players.
-//
-//   H1  SetUiAnchors now clamps all four anchor floats to [0, 1] before
-//       writing them to config.
-//
-//   H2  ApplyUiOffset now enforces a minimum panel dimension of 0.05
-//       units, preventing a degenerate zero-width/zero-height panel at
-//       the edge of the 0–1 range.
-//
-//   H3  WipeModeOverride is sanitised (printable ASCII, max 64 chars) and
-//       parsed before the config is mutated; a bad value returns an error
-//       without dirtying the saved config.
-//
-//   H4  Debug overlay timers no longer close over a BasePlayer reference.
-//       They capture only the ulong userID and resolve the live player via
-//       BasePlayer.FindByID() on each tick, preventing stale-reference
-//       bugs from Rust's object pooling.
-//
-//   M1  UiBackgroundColor and UiTextColor are validated as four space-
-//       separated floats in [0, 1] before being written to CUI JSON.
-//
-//   M2  HitBuffer size increased to 1024; a server console warning is
-//       emitted when the result count reaches the buffer limit, indicating
-//       that the limit may be too small for the current base density.
-//
-//   M3  IsPositionProtected guards against a null _config explicitly.
-//
-//   M4  Tag detection now checks "biweekly" / "bi-weekly" BEFORE "weekly",
-//       so a server tagged "biweekly" is no longer misidentified as Weekly.
-//
-//   M5  /mncdset wipemode parses and validates the new value before saving
-//       or modifying any config fields.
+//   v5.2.0 / v5.1.0  – see CHANGELOG.md for full history
 // ============================================================================
 
 using System;
@@ -84,7 +62,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("ModernNoCupboardDecay", "Gabriel", "5.2.0")]
+    [Info("ModernNoCupboardDecay", "Gabriel", "5.3.0")]
     [Description("Prevents decay within Tool Cupboard radius. Wipe-aware UI, team auth, debug tools. Oxide 2.0.7022+ / Naval Update compatible.")]
     public class ModernNoCupboardDecay : RustPlugin
     {
@@ -93,7 +71,7 @@ namespace Oxide.Plugins
         // ====================================================================
         #region Fields
 
-        /// <summary>Loaded and validated configuration. Never null after OnServerInitialized.</summary>
+        /// <summary>Loaded and validated configuration. Null only before OnServerInitialized.</summary>
         private ConfigData _config;
 
         /// <summary>True only after OnServerInitialized completes without error.</summary>
@@ -114,34 +92,33 @@ namespace Oxide.Plugins
         private const string PermPreview = "modernnocupboarddecay.preview";
 
         // --- CUI element name constants -------------------------------------
-        // These names must be unique per plugin instance.  Two simultaneously
-        // loaded forks would collide; rename these if you fork this plugin.
+        // These names must be unique per plugin instance.  If you fork this
+        // plugin, rename these constants to avoid panel conflicts.
         private const string UiWipe  = "MNCD_WipeTimer";
         private const string UiDebug = "MNCD_DebugOverlay";
 
         // --- Physics overlap buffer -----------------------------------------
-        // SECURITY FIX (C1): Instance field instead of static.  A static
-        // buffer is shared across all calls on the same AppDomain; concurrent
-        // decay hooks and debug-overlay timers in the same Oxide frame would
-        // read each other's results.  An instance field is private to this
-        // plugin instance.
+        // SECURITY (C1 / v5.1.0): Instance field, not static.  A static buffer
+        // is shared across all calls on the same AppDomain; concurrent decay
+        // hooks and debug-overlay timers in the same Oxide frame would corrupt
+        // each other's result counts.
         //
-        // Size 1024: Physics.OverlapSphereNonAlloc silently truncates results
-        // at the buffer length.  1024 covers dense base layouts; if the server
-        // log shows "HitBuffer capacity reached" consistently, increase this.
+        // Size 1024: OverlapSphereNonAlloc silently truncates at buffer length.
+        // A server-console warning is emitted when the limit is reached so
+        // operators know to increase it in the source if needed.
         private readonly Collider[] _hitBuffer = new Collider[1024];
 
         /// <summary>Set of userIDs that currently have the debug overlay active.</summary>
-        private readonly HashSet<ulong>           _debugUsers  = new HashSet<ulong>();
+        private readonly HashSet<ulong> _debugUsers = new HashSet<ulong>();
 
         /// <summary>Per-player Oxide timers driving the debug overlay refresh.</summary>
         private readonly Dictionary<ulong, Timer> _debugTimers = new Dictionary<ulong, Timer>();
 
         /// <summary>
-        /// Per-player Unix timestamp (seconds) of the last /mncdpreview call.
-        /// Used to enforce PreviewCooldownSeconds per player.  (Security fix C3.)
+        /// Per-player Unix timestamp of the last /mncdpreview call.
+        /// Enforces PreviewCooldownSeconds per player.  (SECURITY C3 / v5.1.0.)
         /// </summary>
-        private readonly Dictionary<ulong, long>  _previewLastUsed = new Dictionary<ulong, long>();
+        private readonly Dictionary<ulong, long> _previewLastUsed = new Dictionary<ulong, long>();
 
         /// <summary>Wipe schedule modes supported by the plugin.</summary>
         private enum WipeMode { Manual, Weekly, BiWeekly, Monthly, CustomDays }
@@ -155,34 +132,39 @@ namespace Oxide.Plugins
         #region Configuration
 
         /// <summary>
-        /// Strongly-typed configuration object.  Oxide serialises this to/from
-        /// oxide/config/ModernNoCupboardDecay.json.
+        /// Strongly-typed configuration object serialized to/from
+        /// oxide/config/ModernNoCupboardDecay.json by Oxide.
         ///
-        /// All fields have safe defaults; ValidateConfig() clamps numeric ranges
-        /// after deserialization to prevent hand-edited extremes.
+        /// All fields carry safe defaults.  ValidateConfig clamps numeric
+        /// ranges after deserialization to prevent hand-edited extremes.
+        ///
+        /// NOTE: No C# value tuples are used anywhere in this class or in
+        /// any nested class.  uMod's build server does not ship the
+        /// System.ValueTuple shim, so tuple syntax must never be used.
         /// </summary>
         private class ConfigData
         {
             // --- Protection behaviour ---------------------------------------
 
             /// <summary>
-            /// When false (default), any entity near ANY Tool Cupboard is protected.
+            /// When false (default), any entity near ANY TC is protected.
             /// When true, an entity's OwnerID must be authorized on a nearby TC
-            /// (or be a team member of an authed player, if TeamAwareProtection = true).
+            /// (or be a Rust-team member of an authed player if
+            /// TeamAwareProtection = true).
             /// </summary>
             public bool CheckAuth { get; set; } = false;
 
             /// <summary>
             /// Only meaningful when CheckAuth = true.
-            /// When true, teammates of a TC-authorized player are also protected.
-            /// Uses Rust's built-in RelationshipManager team membership.
+            /// When true, teammates of a TC-authorized player are also protected
+            /// via RelationshipManager team membership.
             /// </summary>
             public bool TeamAwareProtection { get; set; } = true;
 
             /// <summary>
-            /// Radius (meters) around each TC that defines the protection bubble.
-            /// Clamped to [1, 500] by ValidateConfig.
-            /// Default: 30 m (matches Rust's default TC upkeep radius).
+            /// Radius in meters around each TC that defines the protection bubble.
+            /// Clamped to [1, 500] by ValidateConfig.  Default 30 m matches
+            /// Rust's built-in TC upkeep radius.
             /// </summary>
             public float EntityRadius { get; set; } = 30f;
 
@@ -191,15 +173,15 @@ namespace Oxide.Plugins
             /// <summary>
             /// When true, attempt to read wipe mode from ConVar.Server.tags
             /// ("weekly", "biweekly", "monthly", or "Nd" patterns).
-            /// WipeModeOverride is ignored when this is true and a tag is found.
+            /// WipeModeOverride is ignored when a tag is found.
             /// </summary>
             public bool AutoDetectWipeFromTags { get; set; } = true;
 
             /// <summary>
-            /// Fallback wipe mode used when AutoDetectWipeFromTags = false or no
-            /// matching tag is found.  Valid values: Manual, Weekly, BiWeekly,
+            /// Fallback wipe mode used when AutoDetectWipeFromTags = false or
+            /// no matching tag is found.  Valid values: Manual, Weekly, BiWeekly,
             /// Monthly, or a day-count string like "5d".
-            /// SECURITY: Sanitised to printable ASCII, max 64 chars, before storage.
+            /// Sanitised to printable ASCII, max 64 chars, before storage.
             /// </summary>
             public string WipeModeOverride { get; set; } = "Manual";
 
@@ -212,7 +194,8 @@ namespace Oxide.Plugins
 
             /// <summary>
             /// Unix timestamp (UTC seconds) when the current wipe started.
-            /// Set automatically by OnNewSave; can be reset with /mncdset wipestartnow.
+            /// Set automatically by OnNewSave; can be reset with
+            /// /mncdset wipestartnow.
             /// </summary>
             public long WipeStartUnixTime { get; set; } = 0;
 
@@ -222,14 +205,14 @@ namespace Oxide.Plugins
             public bool EnableTcWipeUI { get; set; } = true;
 
             /// <summary>
-            /// CUI background color in "R G B A" format (floats 0–1).
-            /// SECURITY: Validated as four space-separated floats in ValidateConfig.
+            /// CUI background color in "R G B A" format (floats 0-1).
+            /// Validated as four space-separated floats in ValidateConfig.
             /// </summary>
             public string UiBackgroundColor { get; set; } = "0.05 0.05 0.05 0.85";
 
             /// <summary>
-            /// CUI text color in "R G B A" format (floats 0–1).
-            /// SECURITY: Validated as four space-separated floats in ValidateConfig.
+            /// CUI text color in "R G B A" format (floats 0-1).
+            /// Validated as four space-separated floats in ValidateConfig.
             /// </summary>
             public string UiTextColor { get; set; } = "0.9 0.9 0.9 1.0";
 
@@ -249,21 +232,22 @@ namespace Oxide.Plugins
 
             /// <summary>
             /// When false (default), every player can use /mncdpreview.
-            /// When true, the modernnocupboarddecay.preview permission (or IsAdmin) is required.
+            /// When true, the modernnocupboarddecay.preview permission or
+            /// IsAdmin is required.
             /// </summary>
             public bool PreviewRequiresPermission { get; set; } = false;
 
             /// <summary>
-            /// Minimum seconds a player must wait between /mncdpreview calls.
-            /// Prevents repeated full serverEntities scans by any player.
-            /// (Security fix C3.) Clamped to [5, 300] by ValidateConfig.
+            /// Minimum seconds between /mncdpreview calls per player.
+            /// Prevents repeated full serverEntities scans.
+            /// Clamped to [5, 300] by ValidateConfig.
             /// </summary>
             public float PreviewCooldownSeconds { get; set; } = 15f;
 
-            /// <summary>How long (seconds) the preview spheres are visible.  Clamped to [1, 300].</summary>
+            /// <summary>How long (seconds) the preview spheres remain visible. Clamped [1, 300].</summary>
             public float PreviewRingDuration { get; set; } = 30f;
 
-            /// <summary>Multiplies EntityRadius for the visual preview ring only.  Clamped to [0.1, 10].</summary>
+            /// <summary>Multiplies EntityRadius for the visual preview ring only. Clamped [0.1, 10].</summary>
             public float PreviewRingRadiusMultiplier { get; set; } = 1.0f;
         }
 
@@ -281,7 +265,7 @@ namespace Oxide.Plugins
 
         /// <summary>
         /// Reads the config file, falls back to defaults on failure, validates
-        /// all fields, and writes the (possibly corrected) config back to disk.
+        /// all fields, and writes the corrected config back to disk.
         /// </summary>
         private void LoadConfigData()
         {
@@ -293,7 +277,7 @@ namespace Oxide.Plugins
             }
             catch (Exception e)
             {
-                PrintWarning($"Config load error – using defaults: {e.Message}");
+                PrintWarning($"Config load error - using defaults: {e.Message}");
                 _config = new ConfigData();
             }
 
@@ -303,25 +287,22 @@ namespace Oxide.Plugins
         }
 
         /// <summary>
-        /// Clamps numeric ranges and validates string fields that are later
-        /// used in CUI JSON to prevent injection through a hand-edited config.
+        /// Clamps numeric ranges and validates string fields used in CUI JSON.
         ///
         /// SECURITY (M1): UiBackgroundColor and UiTextColor are validated as
-        /// four space-separated floats in [0, 1].  Invalid values are replaced
-        /// with safe defaults so CUI JSON is never constructed from arbitrary text.
+        /// four space-separated floats in [0, 1].  Invalid values fall back to
+        /// safe defaults so CUI JSON is never built from arbitrary text.
         ///
         /// SECURITY (H3): WipeModeOverride is sanitised before storage.
         /// </summary>
         private void ValidateConfig()
         {
-            // Numeric range clamps
-            _config.EntityRadius              = Mathf.Clamp(_config.EntityRadius, 1f, 500f);
-            _config.CustomWipeDays            = Mathf.Clamp(_config.CustomWipeDays, 0, 365);
-            _config.PreviewRingDuration       = Mathf.Clamp(_config.PreviewRingDuration, 1f, 300f);
+            _config.EntityRadius               = Mathf.Clamp(_config.EntityRadius, 1f, 500f);
+            _config.CustomWipeDays             = Mathf.Clamp(_config.CustomWipeDays, 0, 365);
+            _config.PreviewRingDuration        = Mathf.Clamp(_config.PreviewRingDuration, 1f, 300f);
             _config.PreviewRingRadiusMultiplier = Mathf.Clamp(_config.PreviewRingRadiusMultiplier, 0.1f, 10f);
-            _config.PreviewCooldownSeconds    = Mathf.Clamp(_config.PreviewCooldownSeconds, 5f, 300f);
+            _config.PreviewCooldownSeconds     = Mathf.Clamp(_config.PreviewCooldownSeconds, 5f, 300f);
 
-            // Color string validation  (SECURITY M1)
             if (!IsValidCuiColor(_config.UiBackgroundColor))
             {
                 PrintWarning($"UiBackgroundColor '{_config.UiBackgroundColor}' is invalid; resetting to default.");
@@ -333,17 +314,14 @@ namespace Oxide.Plugins
                 _config.UiTextColor = "0.9 0.9 0.9 1.0";
             }
 
-            // WipeModeOverride sanitisation  (SECURITY H3)
             _config.WipeModeOverride = SanitiseWipeModeString(_config.WipeModeOverride);
 
-            // Anchor sanity – parse and re-serialize through our formatter so
-            // values stored on disk are always the canonical "X Y" representation.
-            if (!TryParseAnchor(_config.UiAnchorMin, out float minX, out float minY))
+            float minX, minY, maxX, maxY;
+            if (!TryParseAnchor(_config.UiAnchorMin, out minX, out minY))
             { minX = 0.4f; minY = 0.92f; }
-            if (!TryParseAnchor(_config.UiAnchorMax, out float maxX, out float maxY))
+            if (!TryParseAnchor(_config.UiAnchorMax, out maxX, out maxY))
             { maxX = 0.6f; maxY = 0.98f; }
 
-            // Rewrite anchors through the clamp path to guarantee stored values are in [0,1]
             WriteAnchorsSafe(minX, minY, maxX, maxY);
         }
 
@@ -359,8 +337,8 @@ namespace Oxide.Plugins
         #region Localization
 
         /// <summary>
-        /// Registers all English (fallback) localization keys.
-        /// Translators add their own locale files under oxide/lang/{locale}/.
+        /// Registers all English (fallback) localisation keys.
+        /// Per-locale overrides live in oxide/lang/{locale}/ModernNoCupboardDecay.json.
         /// </summary>
         private void LoadDefaultMessages()
         {
@@ -372,18 +350,18 @@ namespace Oxide.Plugins
                     "AutoDetect: {6} | WipeMode: {7} (Override: {8}) | WipeRemaining: {9} | Status: {10}",
 
                 // Errors
-                ["Error.NoPermission"]    = "[MNCD] You do not have permission to change settings.",
+                ["Error.NoPermission"]      = "[MNCD] You do not have permission to change settings.",
                 ["Error.NoDebugPermission"] = "[MNCD] You do not have permission to use the debug overlay.",
-                ["Error.ConfigOption"]    = "[MNCD] Unknown option. Valid options: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow.",
-                ["Error.ConfigApply"]     = "[MNCD] Error applying '{0}': {1}",
-                ["Error.CheckAuthValue"]  = "[MNCD] checkauth requires true/false.",
-                ["Error.TeamAwareValue"]  = "[MNCD] teamaware requires true/false.",
-                ["Error.AutoDetectValue"] = "[MNCD] autodetect requires true/false.",
-                ["Error.RadiusValue"]     = "[MNCD] radius requires a positive number in meters (1–500).",
-                ["Error.WipeModeValue"]   = "[MNCD] wipemode requires: Manual, Weekly, BiWeekly, Monthly, or a day count like 5d.",
-                ["Error.BoolExpected"]    = "[MNCD] {0} requires true or false.",
+                ["Error.ConfigOption"]      = "[MNCD] Unknown option. Valid options: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow.",
+                ["Error.ConfigApply"]       = "[MNCD] Error applying '{0}': {1}",
+                ["Error.CheckAuthValue"]    = "[MNCD] checkauth requires true/false.",
+                ["Error.TeamAwareValue"]    = "[MNCD] teamaware requires true/false.",
+                ["Error.AutoDetectValue"]   = "[MNCD] autodetect requires true/false.",
+                ["Error.RadiusValue"]       = "[MNCD] radius requires a positive number in meters (1-500).",
+                ["Error.WipeModeValue"]     = "[MNCD] wipemode requires: Manual, Weekly, BiWeekly, Monthly, or a day count like 5d.",
+                ["Error.BoolExpected"]      = "[MNCD] {0} requires true or false.",
 
-                // Cooldown
+                // Preview cooldown  (SECURITY S3 / v5.3.0: was missing from lang JSON files)
                 ["Preview.Cooldown"] = "[MNCD] Please wait {0} more seconds before using /mncdpreview again.",
 
                 // Usage
@@ -408,7 +386,7 @@ namespace Oxide.Plugins
 
                 // Wipe-timer UI text
                 ["UI.WipeTitle"] = "ModernNoCupboardDecay",
-                ["UI.WipeLine"]  = "Wipe: {0}  –  {1} remaining",
+                ["UI.WipeLine"]  = "Wipe: {0}  -  {1} remaining",
                 ["UI.WipeExtra"] = "Decay disabled within this Tool Cupboard radius.",
 
                 // UI Anchor commands
@@ -419,9 +397,9 @@ namespace Oxide.Plugins
                 ["UIAnchor.Error.Order"]   = "[MNCD] minX < maxX and minY < maxY is required.",
 
                 // Debug overlay
-                ["Debug.Enabled"]        = "[MNCD] Debug overlay enabled.  Shows whether you are inside a protection zone.",
-                ["Debug.Disabled"]       = "[MNCD] Debug overlay disabled.",
-                ["Debug.UI.Protected"]   = "MNCD: Protected",
+                ["Debug.Enabled"]         = "[MNCD] Debug overlay enabled.  Shows whether you are inside a protection zone.",
+                ["Debug.Disabled"]        = "[MNCD] Debug overlay disabled.",
+                ["Debug.UI.Protected"]    = "MNCD: Protected",
                 ["Debug.UI.NotProtected"] = "MNCD: Not Protected",
 
                 // Preview
@@ -434,14 +412,14 @@ namespace Oxide.Plugins
                 ["Help.General"] =
                     "ModernNoCupboardDecay prevents decay for entities within TC radius and shows wipe info.\n" +
                     "Basic commands:\n" +
-                    "  /mncd               – Show plugin status.\n" +
-                    "  /mncdhelp [topic]   – Help topics: basic, ui, set, debug, preview, wipe.\n" +
-                    "  /mncdpreview        – Draw TC protection rings.\n" +
-                    "  /mncddebug          – Toggle protection-status overlay.\n" +
+                    "  /mncd               - Show plugin status.\n" +
+                    "  /mncdhelp [topic]   - Help topics: basic, ui, set, debug, preview, wipe.\n" +
+                    "  /mncdpreview        - Draw TC protection rings.\n" +
+                    "  /mncddebug          - Toggle protection-status overlay.\n" +
                     "Admin commands:\n" +
-                    "  /mncdset            – Live config changes.\n" +
-                    "  /mncdui, /mncduiadd – Move the wipe UI panel.\n" +
-                    "  /mncdresetui        – Reset wipe UI to default position.",
+                    "  /mncdset            - Live config changes.\n" +
+                    "  /mncdui, /mncduiadd - Move the wipe UI panel.\n" +
+                    "  /mncdresetui        - Reset wipe UI to default position.",
                 ["Help.UnknownTopic"] = "[MNCD] Unknown topic '{0}'.  Valid topics: basic, ui, set, debug, preview, wipe.",
                 ["Help.Topic.basic"] =
                     "MNCD basics:\n" +
@@ -451,18 +429,18 @@ namespace Oxide.Plugins
                     "  The TC upkeep display shows time-until-wipe in the MNCD panel.",
                 ["Help.Topic.ui"] =
                     "UI positioning (admin only):\n" +
-                    "  /mncdui <minX> <minY> <maxX> <maxY>  – Set panel anchors (0..1 each).\n" +
-                    "  /mncduiadd <dx> <dy>                  – Nudge panel position.\n" +
-                    "  /mncdresetui                          – Reset to default top-center.\n" +
+                    "  /mncdui <minX> <minY> <maxX> <maxY>  - Set panel anchors (0..1 each).\n" +
+                    "  /mncduiadd <dx> <dy>                  - Nudge panel position.\n" +
+                    "  /mncdresetui                          - Reset to default top-center.\n" +
                     "Reopen the TC after changing the panel position.",
                 ["Help.Topic.set"] =
                     "Live configuration (/mncdset or mncd.set):\n" +
-                    "  checkauth  <true|false>  – Restrict to TC-authed owners/teams.\n" +
-                    "  teamaware  <true|false>  – Include Rust team members (needs checkauth = true).\n" +
-                    "  radius     <meters>      – TC protection radius (1–500).\n" +
-                    "  autodetect <true|false>  – Auto-read wipe mode from server.tags.\n" +
-                    "  wipemode   <mode>        – Manual|Weekly|BiWeekly|Monthly|Nd (e.g. 5d).\n" +
-                    "  wipestartnow             – Reset wipe start time to now.",
+                    "  checkauth  <true|false>  - Restrict to TC-authed owners/teams.\n" +
+                    "  teamaware  <true|false>  - Include Rust team members (needs checkauth = true).\n" +
+                    "  radius     <meters>      - TC protection radius (1-500).\n" +
+                    "  autodetect <true|false>  - Auto-read wipe mode from server.tags.\n" +
+                    "  wipemode   <mode>        - Manual|Weekly|BiWeekly|Monthly|Nd (e.g. 5d).\n" +
+                    "  wipestartnow             - Reset wipe start time to now.",
                 ["Help.Topic.debug"] =
                     "Debug overlay (/mncddebug or mncd.debug):\n" +
                     "  Toggles a small 'MNCD: Protected / Not Protected' banner.\n" +
@@ -485,18 +463,14 @@ namespace Oxide.Plugins
         }
 
         /// <summary>
-        /// Retrieves a localised message, formats it with <paramref name="args"/>,
-        /// and returns the raw key on FormatException so a bad translation never
-        /// crashes the plugin.
+        /// Retrieves a localised message, formats it with args, and returns
+        /// the raw key on FormatException so a bad translation never crashes
+        /// the plugin.
         /// </summary>
-        /// <param name="key">Lang dictionary key.</param>
-        /// <param name="userId">Steam64 ID string of the recipient, for per-player locale.</param>
-        /// <param name="args">Optional format arguments.</param>
         private string Msg(string key, string userId = null, params object[] args)
         {
             string msg = lang.GetMessage(key, this, userId);
-            if (args == null || args.Length == 0)
-                return msg;
+            if (args == null || args.Length == 0) return msg;
             try   { return string.Format(msg, args); }
             catch (FormatException) { return msg; }
         }
@@ -528,20 +502,20 @@ namespace Oxide.Plugins
         /// <summary>
         /// Called by Oxide after the server has fully started.
         /// Loads config, detects wipe mode, and sets _initialized = true.
-        /// Any exception here leaves the plugin in a safe disabled state that
-        /// returns null from OnEntityTakeDamage (no modification to vanilla decay).
+        /// Any exception here leaves the plugin in a safe disabled state;
+        /// OnEntityTakeDamage returns null immediately so vanilla decay is
+        /// unaffected.
         /// </summary>
         private void OnServerInitialized()
         {
             try
             {
-                // Build the layer mask once; LayerMask.GetMask is moderately expensive.
-                _protectionMask = LayerMask.GetMask("Construction", "Construction Trigger", "Trigger", "Deployed");
+                _protectionMask = LayerMask.GetMask(
+                    "Construction", "Construction Trigger", "Trigger", "Deployed");
 
                 LoadConfigData();
                 DetectWipeModeFromTagsOrConfig();
 
-                // Seed wipe-start time if this is a fresh install or the value was cleared.
                 if (_config.WipeStartUnixTime <= 0)
                 {
                     long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -566,19 +540,16 @@ namespace Oxide.Plugins
         }
 
         /// <summary>
-        /// Called by Oxide when the plugin is unloaded (server shutdown or hot-reload).
-        /// Destroys all timers and removes all CUI panels for connected players so
-        /// stale panels are not left on screen.
+        /// Called by Oxide on plugin unload or hot-reload.
+        /// Destroys all timers and removes all CUI panels for connected players.
         /// </summary>
         private void Unload()
         {
-            // Stop all debug overlay timers.
             foreach (var kvp in _debugTimers)
                 kvp.Value?.Destroy();
             _debugTimers.Clear();
             _debugUsers.Clear();
 
-            // Destroy UI panels for every connected player.
             foreach (var player in BasePlayer.activePlayerList)
             {
                 if (player == null) continue;
@@ -590,9 +561,8 @@ namespace Oxide.Plugins
         /// <summary>
         /// Called by Oxide when the server saves a new map (wipe event).
         /// Resets WipeStartUnixTime to now so the wipe-timer UI counts down
-        /// from the correct baseline after every forced wipe.
+        /// from the correct baseline.
         /// </summary>
-        /// <param name="filename">Map filename; logged for auditing.</param>
         private void OnNewSave(string filename)
         {
             if (_config == null) return;
@@ -612,11 +582,11 @@ namespace Oxide.Plugins
         #region Wipe Detection
 
         /// <summary>
-        /// Sets _wipeMode by reading ConVar.Server.tags (when AutoDetectWipeFromTags
-        /// is true) or falling back to ParseWipeMode(_config.WipeModeOverride).
+        /// Sets _wipeMode from ConVar.Server.tags (when AutoDetectWipeFromTags
+        /// is true) or falls back to ParseWipeMode(_config.WipeModeOverride).
         ///
-        /// SECURITY FIX (M4): "biweekly" / "bi-weekly" are tested BEFORE "weekly"
-        /// so the longer pattern cannot be shadowed by the shorter one.
+        /// SECURITY (M4 / v5.1.0): "biweekly" / "bi-weekly" are tested BEFORE
+        /// "weekly" so the shorter pattern cannot shadow the longer one.
         /// </summary>
         private void DetectWipeModeFromTagsOrConfig()
         {
@@ -631,7 +601,6 @@ namespace Oxide.Plugins
                     {
                         string lower = tags.ToLowerInvariant();
 
-                        // SECURITY M4: check more-specific pattern first.
                         if (lower.Contains("biweekly") || lower.Contains("bi-weekly"))
                             detected = WipeMode.BiWeekly;
                         else if (lower.Contains("weekly"))
@@ -664,7 +633,6 @@ namespace Oxide.Plugins
                 return;
             }
 
-            // Fall back to config override.
             _wipeMode  = ParseWipeMode(_config.WipeModeOverride);
             _statusMsg = $"Wipe mode from config override: {_wipeMode}" +
                          (_wipeMode == WipeMode.CustomDays && _config.CustomWipeDays > 0
@@ -672,11 +640,8 @@ namespace Oxide.Plugins
         }
 
         /// <summary>
-        /// Scans comma-separated tag tokens for a pattern like "5d", "5day", or
-        /// "5days" and returns the day count if it is in [2, 60], else 0.
-        ///
-        /// Accepts formats: "5d", "5day", "5days"; also space/dash/underscore
-        /// separated tokens where a number is adjacent to a day suffix.
+        /// Scans comma-separated tag tokens for a "Nd" pattern (e.g. "5d",
+        /// "5day", "5days") and returns the day count if in [2, 60], else 0.
         /// </summary>
         private int TryExtractDaysFromTags(string lowerTags)
         {
@@ -689,12 +654,12 @@ namespace Oxide.Plugins
                     string t = token.Trim();
                     if (string.IsNullOrEmpty(t)) continue;
 
-                    // Strip trailing day suffix to isolate the numeric part.
                     if      (t.EndsWith("days")) t = t.Substring(0, t.Length - 4);
                     else if (t.EndsWith("day"))  t = t.Substring(0, t.Length - 3);
                     else if (t.EndsWith("d"))    t = t.Substring(0, t.Length - 1);
 
-                    if (int.TryParse(t, NumberStyles.Integer, CultureInfo.InvariantCulture, out int days)
+                    int days;
+                    if (int.TryParse(t, NumberStyles.Integer, CultureInfo.InvariantCulture, out days)
                         && days >= 2 && days <= 60)
                         return days;
                 }
@@ -704,12 +669,7 @@ namespace Oxide.Plugins
 
         /// <summary>
         /// Converts a wipe-mode string to a WipeMode enum value.
-        /// Also sets _config.CustomWipeDays when a numeric day-count is parsed.
-        ///
-        /// Accepted strings (case-insensitive):
-        ///   "Manual", "Weekly", "BiWeekly", "bi-weekly", "Monthly",
-        ///   "5d", "5day", "5days"  (any positive integer)
-        ///
+        /// Sets _config.CustomWipeDays when a numeric day-count is parsed.
         /// Returns WipeMode.Manual for unrecognised input.
         /// </summary>
         private WipeMode ParseWipeMode(string mode)
@@ -718,13 +678,14 @@ namespace Oxide.Plugins
 
             string lower = mode.Trim().ToLowerInvariant();
 
-            // Try day-count pattern first.
             string numPart = lower;
             if      (numPart.EndsWith("days")) numPart = numPart.Substring(0, numPart.Length - 4);
             else if (numPart.EndsWith("day"))  numPart = numPart.Substring(0, numPart.Length - 3);
             else if (numPart.EndsWith("d"))    numPart = numPart.Substring(0, numPart.Length - 1);
 
-            if (int.TryParse(numPart, NumberStyles.Integer, CultureInfo.InvariantCulture, out int days) && days > 0)
+            int days;
+            if (int.TryParse(numPart, NumberStyles.Integer, CultureInfo.InvariantCulture, out days)
+                && days > 0)
             {
                 _config.CustomWipeDays = Mathf.Clamp(days, 1, 365);
                 return WipeMode.CustomDays;
@@ -732,11 +693,11 @@ namespace Oxide.Plugins
 
             switch (lower)
             {
-                case "weekly":               return WipeMode.Weekly;
+                case "weekly":              return WipeMode.Weekly;
                 case "biweekly":
-                case "bi-weekly":            return WipeMode.BiWeekly;
-                case "monthly":              return WipeMode.Monthly;
-                default:                     return WipeMode.Manual;
+                case "bi-weekly":           return WipeMode.BiWeekly;
+                case "monthly":             return WipeMode.Monthly;
+                default:                    return WipeMode.Manual;
             }
         }
 
@@ -751,7 +712,7 @@ namespace Oxide.Plugins
                 case WipeMode.BiWeekly:   return TimeSpan.FromDays(14);
                 case WipeMode.Monthly:    return TimeSpan.FromDays(30);
                 case WipeMode.CustomDays:
-                    return _config.CustomWipeDays > 0
+                    return (_config != null && _config.CustomWipeDays > 0)
                         ? TimeSpan.FromDays(_config.CustomWipeDays)
                         : TimeSpan.Zero;
                 default: return TimeSpan.Zero;
@@ -764,7 +725,7 @@ namespace Oxide.Plugins
         /// </summary>
         private long GetWipeEndUnixTime()
         {
-            if (_config.WipeStartUnixTime <= 0) return 0;
+            if (_config == null || _config.WipeStartUnixTime <= 0) return 0;
             TimeSpan dur = GetWipeDuration();
             return dur == TimeSpan.Zero ? 0 : _config.WipeStartUnixTime + (long)dur.TotalSeconds;
         }
@@ -785,11 +746,18 @@ namespace Oxide.Plugins
         private static string FormatTimeSpan(TimeSpan ts)
             => $"{ts.Days}d {ts.Hours}h {ts.Minutes}m";
 
-        /// <summary>Returns a human-readable wipe mode string including the day count for CustomDays.</summary>
+        /// <summary>
+        /// Returns a human-readable wipe mode string, including day count
+        /// for CustomDays.
+        ///
+        /// SECURITY (S2 / v5.3.0): Guards _config == null so a CustomDays
+        /// lookup cannot throw NullReferenceException if called before
+        /// OnServerInitialized completes.
+        /// </summary>
         private string GetWipeModeDisplayString()
         {
             string mode = _wipeMode.ToString();
-            if (_wipeMode == WipeMode.CustomDays && _config.CustomWipeDays > 0)
+            if (_wipeMode == WipeMode.CustomDays && _config != null && _config.CustomWipeDays > 0)
                 mode += $" ({_config.CustomWipeDays}d)";
             return mode;
         }
@@ -804,7 +772,7 @@ namespace Oxide.Plugins
             Puts($"  AutoDetect: {_config.AutoDetectWipeFromTags}  |  WipeMode: {_wipeMode}");
             Puts($"  WipeStart: {(_config.WipeStartUnixTime > 0 ? DateTimeOffset.FromUnixTimeSeconds(_config.WipeStartUnixTime).ToString("u") : "unset")}");
 
-            var remaining = GetWipeTimeRemaining();
+            TimeSpan? remaining = GetWipeTimeRemaining();
             Puts(remaining.HasValue
                 ? $"  Wipe ends in: {FormatTimeSpan(remaining.Value)}"
                 : "  Wipe end: N/A (manual mode or missing data).");
@@ -820,22 +788,19 @@ namespace Oxide.Plugins
 
         /// <summary>
         /// Oxide hook: called whenever any entity takes any damage.
-        /// We intercept Decay-type damage only.  If the entity's position is
-        /// within range of a qualifying TC, we zero the decay damage scale,
-        /// which Rust treats as "no damage applied" for that tick.
+        /// Intercepts Decay-type damage only.  If the entity's position is
+        /// within range of a qualifying TC, the decay damage scale is set to
+        /// zero (Rust treats this as no damage for that tick).
         ///
-        /// Returns null in all cases to let other Oxide plugins continue
-        /// processing the hit.  We modify info in-place instead of returning
-        /// a non-null value, which avoids blocking the damage pipeline.
+        /// Returns null in all cases to allow other plugins to continue
+        /// processing the hit.
         /// </summary>
         private object OnEntityTakeDamage(BaseCombatEntity entity, HitInfo info)
         {
-            // Guard: plugin not ready, or arguments invalid.
-            // SECURITY (M3): also guards against _config being null.
+            // SECURITY (M3): also guards _config == null explicitly.
             if (!_initialized || _config == null || entity == null || info == null)
                 return null;
 
-            // Fast-exit: only process decay damage.
             if (!info.damageTypes.Has(DamageType.Decay))
                 return null;
 
@@ -854,34 +819,22 @@ namespace Oxide.Plugins
         #region Protection Logic
 
         /// <summary>
-        /// Returns the OwnerID of the entity.  Falls back to 0 if the entity
-        /// has no owner (e.g. server-spawned entities).
-        ///
-        /// Note: the original code also checked info.HitEntity.OwnerID as a
-        /// fallback, but for decay hits HitEntity == entity, so that read was
-        /// a no-op.  Removed for clarity.
+        /// Returns the OwnerID of the entity, or 0 for server-spawned entities.
         /// </summary>
         private static ulong GetOwnerId(BaseCombatEntity entity)
             => entity?.OwnerID ?? 0;
 
         /// <summary>
-        /// Core protection query.  Uses Physics.OverlapSphereNonAlloc with a
+        /// Core protection query using Physics.OverlapSphereNonAlloc with a
         /// pre-allocated instance-level buffer (zero GC allocation per call).
         ///
-        /// SECURITY FIX (C1): Buffer is an instance field, not static.
-        /// SECURITY FIX (M2): Warns when result count == buffer capacity.
-        /// SECURITY FIX (M3): Returns false immediately if _config is null.
-        ///
         /// Algorithm:
-        ///   1. Find all colliders within _config.EntityRadius of the position.
-        ///   2. For each collider, walk up the GameObject hierarchy looking for a
-        ///      BuildingPrivlidge component (the TC).
-        ///   3a. If CheckAuth = false: any TC found means protected.
-        ///   3b. If CheckAuth = true:  the ownerId must be directly authorized on
-        ///       the TC, or a team member of an authorized player (when TeamAwareProtection = true).
+        ///   1. Find all colliders within EntityRadius of the position.
+        ///   2. Walk each collider's hierarchy for a BuildingPrivlidge component.
+        ///   3a. CheckAuth = false: any TC found means protected.
+        ///   3b. CheckAuth = true:  ownerId must be authorized on the TC, or be a
+        ///       team member of an authorized player (when TeamAwareProtection = true).
         /// </summary>
-        /// <param name="position">World position to test.</param>
-        /// <param name="ownerId">Steam64 ID of the entity's owner (0 = no owner).</param>
         private bool IsPositionProtected(Vector3 position, ulong ownerId)
         {
             if (_config == null) return false;
@@ -889,7 +842,7 @@ namespace Oxide.Plugins
             int count = Physics.OverlapSphereNonAlloc(
                 position, _config.EntityRadius, _hitBuffer, _protectionMask);
 
-            // SECURITY M2: warn if results were truncated.
+            // SECURITY (M2): warn if results were truncated at buffer capacity.
             if (count == _hitBuffer.Length)
                 PrintWarning(
                     $"[MNCD] HitBuffer capacity ({_hitBuffer.Length}) reached near {position}. " +
@@ -897,7 +850,6 @@ namespace Oxide.Plugins
 
             if (!_config.CheckAuth)
             {
-                // Fast path: any TC within range = protected.
                 for (int i = 0; i < count; i++)
                 {
                     if (_hitBuffer[i].GetComponentInParent<BuildingPrivlidge>() != null)
@@ -906,7 +858,6 @@ namespace Oxide.Plugins
                 return false;
             }
 
-            // Auth path: entity must be owned by someone who is authorized on a nearby TC.
             if (ownerId == 0) return false;
 
             for (int i = 0; i < count; i++)
@@ -922,30 +873,25 @@ namespace Oxide.Plugins
         /// Returns true when ownerId is directly authorized on the TC, or is a
         /// Rust team member of any authorized player (when TeamAwareProtection = true).
         ///
-        /// Uses ProtoBuf.PlayerNameID.userid, which is the correct access pattern
-        /// for Oxide v2.0.7022+ / Naval Update.
+        /// Uses ProtoBuf.PlayerNameID.userid for the correct access pattern on
+        /// Oxide v2.0.7022+ / Naval Update.
         /// </summary>
         private bool IsOwnerAuthorizedOrTeammate(BuildingPrivlidge priv, ulong ownerId)
         {
             if (priv == null || ownerId == 0) return false;
 
-            // Direct auth check.
             if (IsAuthorizedOnCupboard(priv, ownerId)) return true;
             if (!_config.TeamAwareProtection) return false;
 
-            // Team-aware check: find the entity owner's Rust team, then see if
-            // the TC owner or any TC-authed player is on that same team.
             var rm = RelationshipManager.ServerInstance;
             if (rm == null) return false;
 
             var ownerTeam = rm.FindPlayersTeam(ownerId);
             if (ownerTeam == null) return false;
 
-            // Is the TC's building owner on the entity owner's team?
             if (priv.OwnerID != 0 && ownerTeam.members.Contains(priv.OwnerID))
                 return true;
 
-            // Is any directly-authorized player on the entity owner's team?
             var authList = priv.authorizedPlayers;
             if (authList != null)
             {
@@ -960,7 +906,7 @@ namespace Oxide.Plugins
 
         /// <summary>
         /// Iterates the TC's authorizedPlayers list and returns true if ownerId
-        /// is present.  Uses a plain for-loop to avoid LINQ allocation.
+        /// is present.  Uses a plain for-loop to avoid enumerator allocation.
         /// </summary>
         private static bool IsAuthorizedOnCupboard(BuildingPrivlidge priv, ulong ownerId)
         {
@@ -978,22 +924,21 @@ namespace Oxide.Plugins
 
 
         // ====================================================================
-        // #region Permissions & Shared Helpers
+        // #region Permissions and Shared Helpers
         // ====================================================================
-        #region Permissions & Shared Helpers
+        #region Permissions and Shared Helpers
 
-        /// <summary>True when the player is a server admin or has the admin permission node.</summary>
+        /// <summary>True when the player is a server admin or holds the admin permission node.</summary>
         private bool HasAdminPerm(BasePlayer player)
             => player != null && (player.IsAdmin || permission.UserHasPermission(player.UserIDString, PermAdmin));
 
-        /// <summary>True when the player is a server admin or has the debug permission node.</summary>
+        /// <summary>True when the player is a server admin or holds the debug permission node.</summary>
         private bool HasDebugPerm(BasePlayer player)
             => player != null && (player.IsAdmin || permission.UserHasPermission(player.UserIDString, PermDebug));
 
         /// <summary>
         /// True when the player can use /mncdpreview.
         /// When PreviewRequiresPermission = false, all players pass.
-        /// When true, admin or the preview permission node is required.
         /// </summary>
         private bool HasPreviewPerm(BasePlayer player)
         {
@@ -1004,9 +949,7 @@ namespace Oxide.Plugins
 
         /// <summary>
         /// Parses common boolean representations.
-        /// Accepted truthy:  "true", "1", "yes", "on"
-        /// Accepted falsy:   "false", "0", "no", "off"
-        /// Returns false (and sets result = false) for anything else.
+        /// Truthy: "true", "1", "yes", "on".  Falsy: "false", "0", "no", "off".
         /// </summary>
         private static bool TryParseBool(string value, out bool result)
         {
@@ -1020,7 +963,7 @@ namespace Oxide.Plugins
             }
         }
 
-        /// <summary>Culture-invariant float parser; returns false on failure.</summary>
+        /// <summary>Culture-invariant float parser.</summary>
         private static bool TryParseFloat(string s, out float f)
             => float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out f);
 
@@ -1032,7 +975,7 @@ namespace Oxide.Plugins
         {
             x = y = 0f;
             if (string.IsNullOrEmpty(anchor)) return false;
-            var parts = anchor.Trim().Split(' ');
+            string[] parts = anchor.Trim().Split(' ');
             return parts.Length == 2
                 && TryParseFloat(parts[0], out x)
                 && TryParseFloat(parts[1], out y);
@@ -1040,14 +983,14 @@ namespace Oxide.Plugins
 
         /// <summary>
         /// Returns the canonical "X Y" anchor string using invariant culture and
-        /// exactly three decimal places, ensuring deterministic serialization.
+        /// three decimal places, ensuring deterministic serialization.
         /// </summary>
         private static string ToAnchorString(float x, float y)
             => $"{x.ToString("0.###", CultureInfo.InvariantCulture)} {y.ToString("0.###", CultureInfo.InvariantCulture)}";
 
         /// <summary>
-        /// Validates a CUI color string: must be exactly four space-separated
-        /// floats each in [0, 1].  Rust's CUI JSON uses this exact format.
+        /// Validates a CUI color string: exactly four space-separated floats
+        /// each in [0, 1].
         ///
         /// SECURITY (M1): Called before any color string is written to a CUI
         /// element so a malformed config cannot inject JSON characters.
@@ -1055,11 +998,12 @@ namespace Oxide.Plugins
         private static bool IsValidCuiColor(string color)
         {
             if (string.IsNullOrEmpty(color)) return false;
-            var parts = color.Trim().Split(' ');
+            string[] parts = color.Trim().Split(' ');
             if (parts.Length != 4) return false;
-            foreach (var part in parts)
+            foreach (string part in parts)
             {
-                if (!float.TryParse(part, NumberStyles.Float, CultureInfo.InvariantCulture, out float f))
+                float f;
+                if (!float.TryParse(part, NumberStyles.Float, CultureInfo.InvariantCulture, out f))
                     return false;
                 if (f < 0f || f > 1f) return false;
             }
@@ -1067,14 +1011,11 @@ namespace Oxide.Plugins
         }
 
         /// <summary>
-        /// Sanitises a wipe-mode override string:
-        ///   – strips non-printable characters
-        ///   – trims whitespace
-        ///   – truncates to 64 characters
-        ///
-        /// SECURITY (H3): Prevents overlong or control-character-laden strings
-        /// from being stored in config and echoed back into chat.
+        /// Sanitises a wipe-mode override string to printable ASCII, max 64 chars.
         /// Returns "Manual" if the result is empty.
+        ///
+        /// SECURITY (H3): Prevents overlong or control-character strings from
+        /// being stored in config or echoed back into chat.
         /// </summary>
         private static string SanitiseWipeModeString(string raw)
         {
@@ -1083,7 +1024,7 @@ namespace Oxide.Plugins
             var sb = new System.Text.StringBuilder(64);
             foreach (char c in raw)
             {
-                if (c >= 0x20 && c < 0x7F)  // printable ASCII only
+                if (c >= 0x20 && c < 0x7F)
                     sb.Append(c);
                 if (sb.Length >= 64) break;
             }
@@ -1093,7 +1034,7 @@ namespace Oxide.Plugins
 
         /// <summary>
         /// Sends a message to an in-game player or logs it to the console,
-        /// depending on which context the command was invoked from.
+        /// depending on the command's invocation context.
         /// </summary>
         private void Reply(BasePlayer player, ConsoleSystem.Arg arg, string message)
         {
@@ -1109,7 +1050,7 @@ namespace Oxide.Plugins
         // ====================================================================
         #region Status Commands
 
-        /// <summary>/mncd – Shows the current plugin status to any player.</summary>
+        /// <summary>/mncd - Shows the current plugin status to any player.</summary>
         [ChatCommand("mncd")]
         private void CmdMncdChat(BasePlayer player, string command, string[] args)
         {
@@ -1117,7 +1058,7 @@ namespace Oxide.Plugins
             SendReply(player, GetStatusReport(player.UserIDString));
         }
 
-        /// <summary>mncd – Console/RCON equivalent of /mncd.</summary>
+        /// <summary>mncd - Console/RCON equivalent of /mncd.</summary>
         [ConsoleCommand("mncd")]
         private void CmdMncdConsole(ConsoleSystem.Arg arg)
         {
@@ -1128,9 +1069,9 @@ namespace Oxide.Plugins
         /// <summary>Builds the status report string shown by /mncd.</summary>
         private string GetStatusReport(string userId = null)
         {
-            string initState   = _initialized ? "ENABLED" : "NOT INITIALIZED";
-            var    remaining   = GetWipeTimeRemaining();
-            string wipeRemain  = remaining.HasValue ? FormatTimeSpan(remaining.Value) : "N/A";
+            string initState  = _initialized ? "ENABLED" : "NOT INITIALIZED";
+            TimeSpan? remaining = GetWipeTimeRemaining();
+            string wipeRemain = remaining.HasValue ? FormatTimeSpan(remaining.Value) : "N/A";
 
             return Msg("Status.Report", userId,
                 Title, Version,
@@ -1153,7 +1094,7 @@ namespace Oxide.Plugins
         // ====================================================================
         #region Help Commands
 
-        /// <summary>/mncdhelp [topic] – Shows help text for the specified topic.</summary>
+        /// <summary>/mncdhelp [topic] - Shows help text for the specified topic.</summary>
         [ChatCommand("mncdhelp")]
         private void CmdHelpChat(BasePlayer player, string command, string[] args)
         {
@@ -1162,7 +1103,7 @@ namespace Oxide.Plugins
             SendReply(player, BuildHelpText(topic, player.UserIDString));
         }
 
-        /// <summary>mncd.help [topic] – Console equivalent of /mncdhelp.</summary>
+        /// <summary>mncd.help [topic] - Console equivalent of /mncdhelp.</summary>
         [ConsoleCommand("mncd.help")]
         private void CmdHelpConsole(ConsoleSystem.Arg arg)
         {
@@ -1206,9 +1147,7 @@ namespace Oxide.Plugins
         // ====================================================================
         #region Configuration Commands
 
-        /// <summary>
-        /// /mncdset &lt;option&gt; &lt;value&gt;  – Live config editing (admin only).
-        /// </summary>
+        /// <summary>/mncdset &lt;option&gt; &lt;value&gt; - Live config editing (admin only).</summary>
         [ChatCommand("mncdset")]
         private void CmdSetChat(BasePlayer player, string command, string[] args)
         {
@@ -1227,12 +1166,11 @@ namespace Oxide.Plugins
         }
 
         /// <summary>
-        /// mncd.set &lt;option&gt; &lt;value&gt;  – Console / RCON equivalent of /mncdset.
+        /// mncd.set &lt;option&gt; &lt;value&gt; - Console / RCON equivalent of /mncdset.
         ///
-        /// SECURITY NOTE (C2): When arg.Player() returns null the caller is RCON or
-        /// the server console, which is already a privileged context (no player-side
-        /// permission check is possible or needed).  The action is logged to the
-        /// server console so it remains auditable.
+        /// SECURITY (C2 / v5.1.0): When arg.Player() returns null the caller is
+        /// RCON or the server console, which is a privileged context.  The action
+        /// is logged to the server console for auditability.
         /// </summary>
         [ConsoleCommand("mncd.set")]
         private void CmdSetConsole(ConsoleSystem.Arg arg)
@@ -1240,7 +1178,6 @@ namespace Oxide.Plugins
             var    player = arg?.Player();
             string userId = player?.UserIDString;
 
-            // In-game player must have the admin permission.
             if (player != null && !HasAdminPerm(player))
             {
                 SendReply(player, Msg("Error.NoPermission", userId));
@@ -1256,7 +1193,6 @@ namespace Oxide.Plugins
             string option = arg.Args[0];
             string value  = arg.Args.Length > 1 ? arg.Args[1] : null;
 
-            // SECURITY C2: Log RCON/console changes so they are auditable.
             if (player == null)
                 Puts($"[MNCD] RCON/console config change: mncd.set {option} {value ?? "(no value)"}");
 
@@ -1264,19 +1200,12 @@ namespace Oxide.Plugins
         }
 
         /// <summary>
-        /// Applies a single live configuration change, saves to disk, and returns
-        /// a localised confirmation or error message.
+        /// Applies a single live configuration change, saves to disk, and
+        /// returns a localised confirmation or error message.
         ///
-        /// SECURITY FIX (M5): wipemode now validates the value and parses it into a
-        /// WipeMode enum BEFORE mutating or saving any config fields.  A bad value
-        /// returns an error and leaves config unchanged.
-        ///
-        /// SECURITY FIX (H3): WipeModeOverride is sanitised through
-        /// SanitiseWipeModeString before storage.
+        /// SECURITY (M5 / v5.1.0): wipemode validates before mutating config.
+        /// SECURITY (H3 / v5.1.0): WipeModeOverride sanitised before storage.
         /// </summary>
-        /// <param name="option">Config key name (case-insensitive).</param>
-        /// <param name="value">New value as a raw string; null for value-less actions.</param>
-        /// <param name="userId">Caller's Steam64 ID string for localisation (null for console).</param>
         private string ApplyConfigChange(string option, string value, string userId)
         {
             if (string.IsNullOrEmpty(option))
@@ -1290,7 +1219,8 @@ namespace Oxide.Plugins
                 {
                     case "checkauth":
                     {
-                        if (!TryParseBool(value, out bool b))
+                        bool b;
+                        if (!TryParseBool(value, out b))
                             return Msg("Error.CheckAuthValue", userId);
                         _config.CheckAuth = b;
                         SaveConfig(_config);
@@ -1302,7 +1232,8 @@ namespace Oxide.Plugins
                     case "teamauth":
                     case "team":
                     {
-                        if (!TryParseBool(value, out bool b))
+                        bool b;
+                        if (!TryParseBool(value, out b))
                             return Msg("Error.TeamAwareValue", userId);
                         _config.TeamAwareProtection = b;
                         SaveConfig(_config);
@@ -1313,8 +1244,9 @@ namespace Oxide.Plugins
                     case "radius":
                     case "entityradius":
                     {
+                        float r;
                         if (string.IsNullOrEmpty(value)
-                            || !TryParseFloat(value, out float r)
+                            || !TryParseFloat(value, out r)
                             || r <= 0f)
                             return Msg("Error.RadiusValue", userId);
 
@@ -1328,7 +1260,8 @@ namespace Oxide.Plugins
                     case "autodetect":
                     case "autotags":
                     {
-                        if (!TryParseBool(value, out bool b))
+                        bool b;
+                        if (!TryParseBool(value, out b))
                             return Msg("Error.AutoDetectValue", userId);
                         _config.AutoDetectWipeFromTags = b;
                         SaveConfig(_config);
@@ -1339,23 +1272,18 @@ namespace Oxide.Plugins
                     case "wipemode":
                     case "wipeoverride":
                     {
-                        // SECURITY M5 + H3: validate and parse BEFORE touching config.
                         if (string.IsNullOrEmpty(value))
                             return Msg("Error.WipeModeValue", userId);
 
                         string sanitised = SanitiseWipeModeString(value);
                         WipeMode parsed  = ParseWipeMode(sanitised);
 
-                        // ParseWipeMode returns Manual for unrecognised strings,
-                        // but we only accept Manual when the user explicitly typed it.
-                        // Reject anything that parsed as Manual but wasn't typed as Manual.
                         bool explicitManual = sanitised.Trim().ToLowerInvariant() == "manual";
                         if (parsed == WipeMode.Manual && !explicitManual)
                             return Msg("Error.WipeModeValue", userId);
 
-                        // All validation passed — now mutate config.
-                        _config.WipeModeOverride          = sanitised;
-                        _config.AutoDetectWipeFromTags     = false;
+                        _config.WipeModeOverride       = sanitised;
+                        _config.AutoDetectWipeFromTags  = false;
                         SaveConfig(_config);
                         DetectWipeModeFromTagsOrConfig();
                         return Msg("Config.WipeMode.Set", userId, sanitised, _wipeMode);
@@ -1369,7 +1297,7 @@ namespace Oxide.Plugins
                         _config.WipeStartUnixTime = now;
                         SaveConfig(_config);
                         _statusMsg = $"WipeStartUnixTime reset to {DateTimeOffset.FromUnixTimeSeconds(now):u}.";
-                        var remaining = GetWipeTimeRemaining();
+                        TimeSpan? remaining = GetWipeTimeRemaining();
                         return Msg("Config.WipeStartNow.Set", userId, _wipeMode,
                             remaining.HasValue ? FormatTimeSpan(remaining.Value) : "N/A");
                     }
@@ -1393,10 +1321,7 @@ namespace Oxide.Plugins
         // ====================================================================
         #region UI Anchor Commands
 
-        /// <summary>
-        /// /mncdui &lt;minX&gt; &lt;minY&gt; &lt;maxX&gt; &lt;maxY&gt;
-        /// Sets the wipe-timer panel anchors in normalized screen space (admin only).
-        /// </summary>
+        /// <summary>/mncdui &lt;minX&gt; &lt;minY&gt; &lt;maxX&gt; &lt;maxY&gt; - Set wipe-timer panel anchors (admin only).</summary>
         [ChatCommand("mncdui")]
         private void CmdUiChat(BasePlayer player, string command, string[] args)
         {
@@ -1409,7 +1334,7 @@ namespace Oxide.Plugins
             HandleUiAnchorChange(player, null, args);
         }
 
-        /// <summary>mncd.ui – Console equivalent of /mncdui.</summary>
+        /// <summary>mncd.ui - Console equivalent of /mncdui.</summary>
         [ConsoleCommand("mncd.ui")]
         private void CmdUiConsole(ConsoleSystem.Arg arg)
         {
@@ -1435,8 +1360,9 @@ namespace Oxide.Plugins
                 return;
             }
 
-            if (!TryParseFloat(args[0], out float minX) || !TryParseFloat(args[1], out float minY) ||
-                !TryParseFloat(args[2], out float maxX) || !TryParseFloat(args[3], out float maxY))
+            float minX, minY, maxX, maxY;
+            if (!TryParseFloat(args[0], out minX) || !TryParseFloat(args[1], out minY) ||
+                !TryParseFloat(args[2], out maxX) || !TryParseFloat(args[3], out maxY))
             {
                 Reply(player, arg, Msg("UIAnchor.Error.Numeric", userId));
                 return;
@@ -1448,16 +1374,12 @@ namespace Oxide.Plugins
                 return;
             }
 
-            // WriteAnchorsSafe clamps each float to [0,1] and enforces minimum dimensions.
             WriteAnchorsSafe(minX, minY, maxX, maxY);
             Reply(player, arg, Msg("UIAnchor.Set", userId, minX, minY, maxX, maxY));
             if (player != null) DestroyWipeTimerUI(player);
         }
 
-        /// <summary>
-        /// /mncduiadd &lt;dx&gt; &lt;dy&gt;
-        /// Nudges the wipe-timer panel by a normalized offset (admin only).
-        /// </summary>
+        /// <summary>/mncduiadd &lt;dx&gt; &lt;dy&gt; - Nudges the panel by a normalized offset (admin only).</summary>
         [ChatCommand("mncduiadd")]
         private void CmdUiAddChat(BasePlayer player, string command, string[] args)
         {
@@ -1470,7 +1392,7 @@ namespace Oxide.Plugins
             HandleUiAddOffset(player, null, args);
         }
 
-        /// <summary>mncd.uiadd – Console equivalent of /mncduiadd.</summary>
+        /// <summary>mncd.uiadd - Console equivalent of /mncduiadd.</summary>
         [ConsoleCommand("mncd.uiadd")]
         private void CmdUiAddConsole(ConsoleSystem.Arg arg)
         {
@@ -1496,7 +1418,8 @@ namespace Oxide.Plugins
                 return;
             }
 
-            if (!TryParseFloat(args[0], out float dx) || !TryParseFloat(args[1], out float dy))
+            float dx, dy;
+            if (!TryParseFloat(args[0], out dx) || !TryParseFloat(args[1], out dy))
             {
                 Reply(player, arg, Msg("UIAnchor.Error.Numeric", userId));
                 return;
@@ -1504,14 +1427,13 @@ namespace Oxide.Plugins
 
             ApplyUiOffset(dx, dy);
 
-            GetCurrentAnchors(out float minX, out float minY, out float maxX, out float maxY);
+            float minX, minY, maxX, maxY;
+            GetCurrentAnchors(out minX, out minY, out maxX, out maxY);
             Reply(player, arg, Msg("Config.UIAdd.Set", userId, dx, dy, minX, minY, maxX, maxY));
             if (player != null) DestroyWipeTimerUI(player);
         }
 
-        /// <summary>
-        /// /mncdresetui  – Resets the wipe-timer panel to the default position (admin only).
-        /// </summary>
+        /// <summary>/mncdresetui - Resets the wipe-timer panel to the default position (admin only).</summary>
         [ChatCommand("mncdresetui")]
         private void CmdResetUiChat(BasePlayer player, string command, string[] args)
         {
@@ -1526,7 +1448,7 @@ namespace Oxide.Plugins
             DestroyWipeTimerUI(player);
         }
 
-        /// <summary>mncd.resetui – Console equivalent of /mncdresetui.</summary>
+        /// <summary>mncd.resetui - Console equivalent of /mncdresetui.</summary>
         [ConsoleCommand("mncd.resetui")]
         private void CmdResetUiConsole(ConsoleSystem.Arg arg)
         {
@@ -1544,10 +1466,10 @@ namespace Oxide.Plugins
         // --- Anchor helpers -------------------------------------------------
 
         /// <summary>
-        /// Writes anchor values to config with safety constraints applied:
-        ///   1. All four floats are clamped to [0, 1]  (SECURITY H1).
-        ///   2. A minimum panel dimension of 0.05 is enforced in both axes
-        ///      (SECURITY H2).
+        /// Writes anchor values to config with safety constraints:
+        ///   1. All four floats are clamped to [0, 1]  (SECURITY H1 / v5.1.0).
+        ///   2. Minimum panel dimension of 0.05 is enforced in both axes
+        ///      (SECURITY H2 / v5.1.0).
         /// </summary>
         private void WriteAnchorsSafe(float minX, float minY, float maxX, float maxY)
         {
@@ -1558,8 +1480,6 @@ namespace Oxide.Plugins
             maxX = Mathf.Clamp01(maxX);
             maxY = Mathf.Clamp01(maxY);
 
-            // Enforce minimum width: if clamping collapsed the panel, push max outward.
-            // If there is no room to push (minX is 1.0), pull minX back instead.
             if (maxX - minX < minDim)
             {
                 maxX = Mathf.Clamp01(minX + minDim);
@@ -1567,7 +1487,6 @@ namespace Oxide.Plugins
                     minX = Mathf.Clamp01(maxX - minDim);
             }
 
-            // Enforce minimum height.
             if (maxY - minY < minDim)
             {
                 maxY = Mathf.Clamp01(minY + minDim);
@@ -1580,21 +1499,15 @@ namespace Oxide.Plugins
             SaveConfig(_config);
         }
 
-        /// <summary>
-        /// Applies a delta offset to the current anchors.
-        /// The resulting anchors are passed through WriteAnchorsSafe so
-        /// all range and minimum-dimension constraints are enforced.
-        /// </summary>
+        /// <summary>Applies a delta offset to the current anchors through WriteAnchorsSafe.</summary>
         private void ApplyUiOffset(float dx, float dy)
         {
-            GetCurrentAnchors(out float minX, out float minY, out float maxX, out float maxY);
+            float minX, minY, maxX, maxY;
+            GetCurrentAnchors(out minX, out minY, out maxX, out maxY);
             WriteAnchorsSafe(minX + dx, minY + dy, maxX + dx, maxY + dy);
         }
 
-        /// <summary>
-        /// Reads the current anchor values from config.
-        /// Falls back to the defaults if parsing fails.
-        /// </summary>
+        /// <summary>Reads current anchor values from config, falling back to defaults on parse failure.</summary>
         private void GetCurrentAnchors(out float minX, out float minY, out float maxX, out float maxY)
         {
             if (!TryParseAnchor(_config.UiAnchorMin, out minX, out minY) ||
@@ -1618,7 +1531,7 @@ namespace Oxide.Plugins
         #region Debug Overlay
 
         /// <summary>
-        /// /mncddebug  – Toggles the per-player protection-status overlay.
+        /// /mncddebug - Toggles the per-player protection-status overlay.
         /// Requires admin or modernnocupboarddecay.debug permission.
         /// </summary>
         [ChatCommand("mncddebug")]
@@ -1633,7 +1546,7 @@ namespace Oxide.Plugins
             ToggleDebugOverlay(player);
         }
 
-        /// <summary>mncd.debug – Console equivalent of /mncddebug (in-game only).</summary>
+        /// <summary>mncd.debug - Console equivalent of /mncddebug (in-game only).</summary>
         [ConsoleCommand("mncd.debug")]
         private void CmdDebugConsole(ConsoleSystem.Arg arg)
         {
@@ -1667,26 +1580,22 @@ namespace Oxide.Plugins
         }
 
         /// <summary>
-        /// Starts a 0.5 s repeating timer that refreshes the debug overlay UI
-        /// for the specified player.
+        /// Starts a 0.5 s repeating timer that refreshes the debug overlay UI.
         ///
-        /// SECURITY FIX (H4): The timer closure captures only the ulong userID,
-        /// NOT a BasePlayer reference.  On each tick it resolves the live player
-        /// via BasePlayer.FindByID so stale references from Rust's object pooling
-        /// are never used.
+        /// SECURITY (H4 / v5.1.0): The timer closure captures only the ulong
+        /// userID, NOT a BasePlayer reference.  BasePlayer.FindByID is called
+        /// on each tick to avoid stale references from Rust's object pooling.
         /// </summary>
         private void EnableDebugOverlay(ulong userId)
         {
             _debugUsers.Add(userId);
 
-            // Destroy any existing timer for this user first.
-            if (_debugTimers.TryGetValue(userId, out var existing))
+            Timer existing;
+            if (_debugTimers.TryGetValue(userId, out existing))
                 existing?.Destroy();
 
-            // Capture userID (value type) only — no reference to BasePlayer.
             _debugTimers[userId] = timer.Every(0.5f, () =>
             {
-                // Resolve the player from the live active list on every tick.
                 var p = BasePlayer.FindByID(userId);
                 if (p == null || !p.IsConnected || p.IsDead())
                 {
@@ -1699,30 +1608,26 @@ namespace Oxide.Plugins
 
         /// <summary>
         /// Stops the debug overlay timer, removes the user from the active set,
-        /// and destroys the CUI panel.
-        /// Accepts a ulong so it can be called from inside the timer closure
-        /// without requiring a BasePlayer reference.
+        /// and destroys the CUI panel.  Accepts ulong so it can be called from
+        /// inside the timer closure without a BasePlayer reference.
         /// </summary>
         private void DisableDebugOverlay(ulong userId)
         {
             _debugUsers.Remove(userId);
 
-            if (_debugTimers.TryGetValue(userId, out var t))
+            Timer t;
+            if (_debugTimers.TryGetValue(userId, out t))
             {
                 t?.Destroy();
                 _debugTimers.Remove(userId);
             }
 
-            // Destroy the panel if the player is still online.
             var p = BasePlayer.FindByID(userId);
             if (p != null && p.IsConnected)
                 CuiHelper.DestroyUi(p, UiDebug);
         }
 
-        /// <summary>
-        /// Overload accepting a BasePlayer for callers that already have the reference
-        /// (e.g. OnPlayerDisconnected).
-        /// </summary>
+        /// <summary>Overload accepting a BasePlayer for callers that already hold the reference.</summary>
         private void DisableDebugOverlay(BasePlayer player)
         {
             if (player == null) return;
@@ -1731,7 +1636,7 @@ namespace Oxide.Plugins
 
         /// <summary>
         /// Rebuilds the "Protected / Not Protected" banner for one player.
-        /// Destroys the previous panel before adding the new one to avoid stacking.
+        /// Destroys the previous panel before adding the new one to prevent stacking.
         /// </summary>
         private void UpdateDebugOverlayUI(BasePlayer player)
         {
@@ -1762,10 +1667,10 @@ namespace Oxide.Plugins
                 {
                     new CuiTextComponent
                     {
-                        Text      = text,
-                        FontSize  = 12,
-                        Align     = TextAnchor.MiddleCenter,
-                        Color     = "1 1 1 1"
+                        Text     = text,
+                        FontSize = 12,
+                        Align    = TextAnchor.MiddleCenter,
+                        Color    = "1 1 1 1"
                     },
                     new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1" }
                 }
@@ -1784,7 +1689,7 @@ namespace Oxide.Plugins
         #region TC Preview
 
         /// <summary>
-        /// /mncdpreview  – Draws client-side spheres showing every TC's protection bubble.
+        /// /mncdpreview - Draws client-side spheres showing every TC's protection bubble.
         /// Subject to per-player cooldown and optional permission gate.
         /// </summary>
         [ChatCommand("mncdpreview")]
@@ -1799,7 +1704,7 @@ namespace Oxide.Plugins
             HandlePreview(player);
         }
 
-        /// <summary>mncd.preview – Console / F1 equivalent of /mncdpreview.</summary>
+        /// <summary>mncd.preview - Console / F1 equivalent of /mncdpreview.</summary>
         [ConsoleCommand("mncd.preview")]
         private void CmdPreviewConsole(ConsoleSystem.Arg arg)
         {
@@ -1820,21 +1725,22 @@ namespace Oxide.Plugins
         /// <summary>
         /// Shared implementation for the TC preview command.
         ///
-        /// SECURITY FIX (C3): Enforces a per-player cooldown of
+        /// SECURITY (C3 / v5.1.0): Enforces a per-player cooldown of
         /// PreviewCooldownSeconds (default 15 s) to prevent repeated
         /// full serverEntities scans from unprivileged players.
         ///
-        /// Performance note: iterating BaseNetworkable.serverEntities is O(n) over
+        /// Performance: Iterating BaseNetworkable.serverEntities is O(n) over
         /// the full entity list.  The cooldown is essential on servers with many
-        /// entities.  Admins (IsAdmin) are not exempt from the cooldown; the scan
-        /// cost is the same regardless of permission level.
+        /// entities.  Admins are not exempt; the scan cost is the same regardless
+        /// of permission level.
         /// </summary>
         private void HandlePreview(BasePlayer player)
         {
             long now         = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             long cooldownSec = (long)_config.PreviewCooldownSeconds;
 
-            if (_previewLastUsed.TryGetValue(player.userID, out long lastUsed))
+            long lastUsed;
+            if (_previewLastUsed.TryGetValue(player.userID, out lastUsed))
             {
                 long elapsed   = now - lastUsed;
                 long remaining = cooldownSec - elapsed;
@@ -1851,7 +1757,6 @@ namespace Oxide.Plugins
             float duration = _config.PreviewRingDuration;
             int   tcCount  = 0;
 
-            // Manual iteration avoids LINQ .OfType<>().ToList() allocation.
             foreach (var entity in BaseNetworkable.serverEntities)
             {
                 var tc = entity as BuildingPrivlidge;
@@ -1859,7 +1764,8 @@ namespace Oxide.Plugins
 
                 var pos = tc.transform.position;
                 player.SendConsoleCommand(
-                    "ddraw.sphere", duration, 0f, 1f, 0f, 1f,
+                    "ddraw.sphere", duration,
+                    0f, 1f, 0f, 1f,
                     pos.x, pos.y, pos.z, radius);
                 tcCount++;
             }
@@ -1877,20 +1783,23 @@ namespace Oxide.Plugins
 
 
         // ====================================================================
-        // #region TC Loot Hooks & Wipe-Timer UI
+        // #region TC Loot Hooks and Wipe-Timer UI
         // ====================================================================
-        #region TC Loot Hooks & Wipe-Timer UI
+        #region TC Loot Hooks and Wipe-Timer UI
 
         /// <summary>
         /// Oxide hook: called when a player opens any entity's loot panel.
-        /// When the entity is a BuildingPrivlidge (TC), show the wipe-timer panel.
+        /// When the entity is a BuildingPrivlidge (TC), shows the wipe-timer panel.
+        ///
+        /// SECURITY (S1 / v5.3.0): Guards _initialized and _config == null before
+        /// any wipe-mode or remaining-time access, matching OnEntityTakeDamage.
         /// </summary>
         private void OnLootEntity(BasePlayer player, BaseEntity entity)
         {
-            if (player == null || entity == null)        return;
-            if (!(entity is BuildingPrivlidge))          return;
+            if (!_initialized || _config == null) return;
+            if (player == null || entity == null)   return;
+            if (!(entity is BuildingPrivlidge))      return;
 
-            // Always destroy any stale panel from a previous TC interaction first.
             DestroyWipeTimerUI(player);
 
             string    modeStr   = GetWipeModeDisplayString();
@@ -1898,7 +1807,6 @@ namespace Oxide.Plugins
 
             if (!_config.EnableTcWipeUI)
             {
-                // UI disabled: send a plain text message instead.
                 string userId = player.UserIDString;
                 SendReply(player, remaining.HasValue
                     ? Msg("TcLoot.WithRemaining", userId, modeStr, FormatTimeSpan(remaining.Value))
@@ -1910,13 +1818,13 @@ namespace Oxide.Plugins
             ShowWipeTimerUI(player, modeStr, remainText);
         }
 
-        /// <summary>Oxide hook: called when a player closes a loot panel.  Removes the wipe-timer UI.</summary>
+        /// <summary>Oxide hook: called when a player closes a loot panel. Removes the wipe-timer UI.</summary>
         private void OnLootEntityEnd(BasePlayer player, BaseEntity entity)
         {
             if (player != null) DestroyWipeTimerUI(player);
         }
 
-        /// <summary>Oxide hook: called on player disconnect.  Cleans up both UI panels.</summary>
+        /// <summary>Oxide hook: called on player disconnect. Cleans up both UI panels.</summary>
         private void OnPlayerDisconnected(BasePlayer player, string reason)
         {
             if (player == null) return;
@@ -1927,9 +1835,10 @@ namespace Oxide.Plugins
         /// <summary>
         /// Builds and sends the three-element wipe-timer CUI panel.
         ///
-        /// SECURITY (M1): UiBackgroundColor and UiTextColor are guaranteed valid
-        /// by ValidateConfig; no user-supplied string reaches CuiImageComponent.Color
-        /// or CuiTextComponent.Color without passing IsValidCuiColor first.
+        /// SECURITY (M1 / v5.1.0): UiBackgroundColor and UiTextColor are
+        /// guaranteed valid by ValidateConfig; no user-supplied string reaches
+        /// CuiImageComponent.Color or CuiTextComponent.Color without passing
+        /// IsValidCuiColor first.
         /// </summary>
         private void ShowWipeTimerUI(BasePlayer player, string wipeMode, string remaining)
         {
@@ -1938,7 +1847,6 @@ namespace Oxide.Plugins
             string userId    = player.UserIDString;
             var    container = new CuiElementContainer();
 
-            // Panel background
             container.Add(new CuiElement
             {
                 Name   = UiWipe,
@@ -1950,7 +1858,6 @@ namespace Oxide.Plugins
                 }
             });
 
-            // Title row
             container.Add(new CuiElement
             {
                 Parent = UiWipe,
@@ -1967,7 +1874,6 @@ namespace Oxide.Plugins
                 }
             });
 
-            // Wipe-mode and remaining-time row
             container.Add(new CuiElement
             {
                 Parent = UiWipe,
@@ -1984,7 +1890,6 @@ namespace Oxide.Plugins
                 }
             });
 
-            // Footer note
             container.Add(new CuiElement
             {
                 Parent = UiWipe,

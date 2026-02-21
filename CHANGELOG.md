@@ -3,14 +3,49 @@ All notable changes to this project are documented here.
 
 ---
 
+## [5.3.0] – Security audit, Latin translation, structural fixes
+
+### Fixed (security)
+- **S1** `OnLootEntity` lacked an `_initialized` / `_config == null` guard.
+  If a player opened a TC before `OnServerInitialized` completed (e.g. during
+  a race at server start), `GetWipeModeDisplayString()` and
+  `GetWipeTimeRemaining()` could throw a `NullReferenceException`.  Guard now
+  matches `OnEntityTakeDamage`.
+- **S2** `GetWipeModeDisplayString()` accessed `_config.CustomWipeDays` without
+  a null check on `_config`.  Guard added; safe even if called before init.
+- **S3** `Preview.Cooldown` localisation key was registered in
+  `LoadDefaultMessages()` but absent from all four shipped lang JSON files.
+  Players in non-English locales saw the raw key string instead of the
+  translated message.  Added to all files (en, es, ru, zh-CN, la).
+
+### Fixed (structure)
+- **S4** Stale file `oxide/lang/ModernNoCupboardDecay.en.json` (wrong path,
+  flat layout instead of per-locale subdirectory) removed.
+- **S5** Sample config was at `oxide/oxide/config/ModernNoCupboardDecay.json`
+  (doubly-nested, would create `/oxide/oxide/config/` on disk).  Moved to
+  `oxide/config/ModernNoCupboardDecay.json`.
+
+### Added
+- **Latin (`la`) translation** — full ecclesiastical Latin for all UI strings,
+  help topics, error messages, and command feedback.
+- **Value-tuple policy note** in file header confirming zero C# value-tuple
+  usage (required for uMod build server compatibility).
+
+### Changed
+- `manifest.json`: added `"languages"` array listing all five locales.
+- `.umod.yaml`: description updated to list all five locales.
+- `README.md`: version bump, Latin added to language file list.
+
+---
+
 ## [5.2.0] – Version alignment and documentation pass
 
 Bumps all support files (manifest.json, .umod.yaml, README.md) to match the
 plugin source version.  No functional code changes from 5.1.0.
 
 ### Changed
-- `manifest.json` version field: 5.0.0 → 5.2.0.
-- `.umod.yaml` version field: 4.0.0 → 5.2.0; permissions table completed with
+- `manifest.json` version field: 5.0.0 -> 5.2.0.
+- `.umod.yaml` version field: 4.0.0 -> 5.2.0; permissions table completed with
   all three nodes (admin, debug, preview).
 - `README.md` rewritten to reflect 5.x command set, config table updated with
   `PreviewCooldownSeconds` (new in 5.1.0), and RCON audit note added.
@@ -31,7 +66,7 @@ Full security audit and refactor.  All issues from the code review addressed.
   logged to the server console for auditability.
 - **C3** `/mncdpreview` iterated all of `BaseNetworkable.serverEntities` with
   no rate limit.  Added `PreviewCooldownSeconds` config key (default 15 s,
-  clamp 5–300 s) enforced per-player via `_previewLastUsed` dictionary.
+  clamp 5-300 s) enforced per-player via `_previewLastUsed` dictionary.
 - **H1** `SetUiAnchors` did not clamp floats to `[0, 1]`.  Replaced with
   `WriteAnchorsSafe` which clamps all four inputs before writing to config.
 - **H2** `ApplyUiOffset` could produce a zero-width/zero-height panel at the
@@ -39,98 +74,59 @@ Full security audit and refactor.  All issues from the code review addressed.
   panel dimension of 0.05 in both axes.
 - **H3** `WipeModeOverride` stored raw user input with no sanitisation.
   `SanitiseWipeModeString` now filters to printable ASCII, truncates at 64
-  characters, and falls back to "Manual" on empty input.  Called on config
-  load and before every `wipemode` change.
-- **H4** Debug overlay timer closed over a `BasePlayer` reference.  Rust uses
-  object pooling; a disconnected player's object can be reused for a different
-  connection without the reference going null.  Timer closure now captures only
-  `ulong userID` and calls `BasePlayer.FindByID(userId)` on each tick.
+  characters, and falls back to "Manual" on empty input.
+- **H4** Debug overlay timer closed over a `BasePlayer` reference.  Timer
+  closure now captures only `ulong userID` and calls `BasePlayer.FindByID()`
+  on each tick.
 - **M1** `UiBackgroundColor` and `UiTextColor` were passed to CUI JSON without
-  validation.  `IsValidCuiColor` now validates both as four space-separated
-  floats in `[0, 1]` during `ValidateConfig`; invalid values are replaced with
-  safe defaults.
+  validation.  `IsValidCuiColor` validates both as four space-separated floats
+  in `[0, 1]` during `ValidateConfig`.
 - **M2** `HitBuffer` size raised from 512 to 1024.  A `PrintWarning` is
-  emitted when the result count equals the buffer length (silent truncation
-  previously hid TC misses in dense bases).
-- **M3** `IsPositionProtected` now explicitly guards `_config == null` instead
-  of relying implicitly on the `_initialized` flag.
-- **M4** Tag detection checked `"weekly"` before `"biweekly"`.  Because
-  `"biweekly".Contains("weekly")` is true, servers tagged `"biweekly"` were
-  misidentified as Weekly.  Check order reversed.
+  emitted when the result count equals the buffer length.
+- **M3** `IsPositionProtected` now explicitly guards `_config == null`.
+- **M4** Tag detection checked `"weekly"` before `"biweekly"`.  Check order
+  reversed; `"biweekly"` / `"bi-weekly"` tested first.
 - **M5** `ApplyConfigChange` for `wipemode` mutated and saved config before
-  validating the new value.  Now parses and validates first; a bad value
-  returns an error without touching the saved config.
+  validating the new value.  Now parses and validates first.
 
 ### Added
 - `PreviewCooldownSeconds` config key (default 15 s).
-
-### Refactored
-- Duplicate chat/console command handlers collapsed into shared implementation
-  methods (`HandleUiAnchorChange`, `HandleUiAddOffset`, `HandlePreview`).
-- `DisableDebugOverlay` overloaded to accept either `ulong` or `BasePlayer`.
-- Full XML `<summary>` doc coverage on every `private` method.
-- File header updated with complete security change log.
 
 ---
 
 ## [5.0.0] – Oxide v2.0.7022 / Naval Update Compatibility
 
 Comprehensive refactor targeting Oxide v2.0.7022 and the Facepunch Rust Naval Update.
-Tighter code, critical bug fixes, and performance improvements.
 
 ### Fixed
-- **Critical: `authorizedPlayers` access pattern** — TC auth list contains
-  `ProtoBuf.PlayerNameID` objects; now correctly uses `.userid` instead of
-  comparing the entry object directly with `ulong`. This fixes CheckAuth and
-  TeamAware protection on Oxide v2.0.7022+.
-- **NRE in console help command** — `arg.Args` null check added before access.
-- **FormatException guard** — `Msg()` helper now catches `FormatException` from
-  malformed lang strings instead of crashing.
+- **Critical: `authorizedPlayers` access pattern** — now correctly uses `.userid`.
+- **NRE in console help command** — `arg.Args` null check added.
+- **FormatException guard** — `Msg()` now catches `FormatException`.
 
 ### Added
-- **`Unload()` hook** — Properly destroys all debug timers and CUI elements for
-  every connected player on plugin unload/reload. Prevents orphaned UI panels.
-- **Config validation on load** — Clamps EntityRadius (1-500), CustomWipeDays
-  (0-365), PreviewRingDuration (1-300), PreviewRingRadiusMultiplier (0.1-10).
-  Also enforces radius bounds on live `/mncdset radius` changes.
-- **`Reply()` helper** — Unified console/chat response routing eliminates
-  duplicated if/else blocks across all console commands.
-- **`GetWipeModeDisplayString()` helper** — Eliminates repeated wipe mode
-  formatting logic across status report and TC loot UI.
+- `Unload()` hook — destroys all debug timers and CUI elements on unload.
+- Config validation on load — clamps all numeric ranges.
+- `Reply()` helper — unified console/chat response routing.
+- `GetWipeModeDisplayString()` helper.
 
 ### Improved
-- **Zero-GC decay hot path** — Replaced `Physics.OverlapSphere` (allocates a new
-  `Collider[]` per call) with `Physics.OverlapSphereNonAlloc` and a pre-allocated
-  buffer. Layer mask cached once in `OnServerInitialized` instead of recomputed per tick.
-- **Consolidated protection logic** — Two near-duplicate protection methods merged
-  into single `IsPositionProtected(Vector3, ulong)` used by both decay prevention
-  and debug overlay.
-- **TC preview allocation** — Replaced LINQ `.OfType<BuildingPrivlidge>().ToList()`
-  with manual `foreach`/`as` iteration over `serverEntities`. No list allocation.
-- **Auth list iteration** — Replaced `foreach` with indexed `for` loops on
-  `authorizedPlayers` to avoid enumerator allocation.
-- **Init guard on decay hook** — `OnEntityTakeDamage` returns immediately if
-  plugin has not finished initialization, preventing early null config access.
-- **Removed unused `System.Linq` import** and trailing comment on using statements.
-- **Consistent field naming** — Private fields use underscore prefix convention.
-
-### Compatibility
-- Verified against Oxide/uMod v2.0.7022 API surface.
-- Naval update entities (boats, submarines, floating structures) are protected
-  by the existing radius-based `OverlapSphereNonAlloc` approach.
+- Zero-GC decay hot path via `OverlapSphereNonAlloc` with pre-allocated buffer.
+- Consolidated protection logic into `IsPositionProtected(Vector3, ulong)`.
+- TC preview uses manual `foreach`/`as` iteration; no LINQ allocation.
+- Auth list iteration uses indexed `for` loops.
 
 ---
 
 ## [4.0.0] – The Feature Expansion Update
 
 ### Added
-- TC Protection Preview (Hologram Rings) — `/mncdpreview`
-- Draggable / Adjustable Wipe UI Panel — `/mncdui`, `/mncduiadd`, `/mncdresetui`
-- Real-Time Debug Overlay — `/mncddebug`
-- Full Help System — `/mncdhelp` with topic-based pages
-- Automatic Wipe Detection from server.tags (weekly / biweekly / monthly / Nd)
-- New Runtime Config Commands via `/mncdset`
-- Localization for English, Spanish, Russian, Simplified Chinese
+- TC Protection Preview (Hologram Rings)
+- Draggable / Adjustable Wipe UI Panel
+- Real-Time Debug Overlay
+- Full Help System
+- Automatic Wipe Detection from server.tags
+- New Runtime Config Commands
+- Localization for en, es, ru, zh-CN
 
 ---
 

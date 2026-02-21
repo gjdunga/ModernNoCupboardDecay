@@ -1,6 +1,5 @@
 {
   "Status.Report": "[{0}] v{1} | Estado: {2} | Radio: {3} | CheckAuth: {4} | TeamAware: {5} | AutoDetect: {6} | WipeMode: {7} (Forzado: {8}) | WipeRestante: {9} | Mensaje: {10}",
-
   "Error.NoPermission": "[MNCD] No tienes permiso para cambiar la configuración.",
   "Error.NoDebugPermission": "[MNCD] No tienes permiso para usar la superposición de depuración.",
   "Error.ConfigOption": "[MNCD] Opción desconocida. Opciones válidas: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow.",
@@ -11,14 +10,13 @@
   "Error.RadiusValue": "[MNCD] radius requiere un valor numérico positivo en metros.",
   "Error.WipeModeValue": "[MNCD] wipemode requiere uno de: Manual, Weekly, BiWeekly, Monthly, o un número de días como 5d.",
   "Error.BoolExpected": "[MNCD] {0} requiere true/false.",
-
+  "Preview.Cooldown": "[MNCD] Espera {0} segundos más antes de usar /mncdpreview de nuevo.",
   "Usage.MncdSet.Chat": "[MNCD] Uso: /mncdset <opción> <valor>. Opciones: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow.",
   "Usage.MncdSet.Console": "[MNCD] Uso: mncd.set <opción> <valor>. Opciones: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow.",
   "Usage.UIAdd.Chat": "[MNCD] Uso: /mncduiadd <deltaX> <deltaY> (desplazamientos normalizados 0..1).",
   "Usage.UIAdd.Console": "[MNCD] Uso: mncd.uiadd <deltaX> <deltaY> (desplazamientos normalizados 0..1).",
   "Usage.UIReset.Chat": "[MNCD] Uso: /mncdresetui (restablece la posición por defecto del panel UI).",
   "Usage.UIReset.Console": "[MNCD] Uso: mncd.resetui (restablece la posición por defecto del panel UI).",
-
   "Config.CheckAuth.Set": "[MNCD] CheckAuth ahora es {0}.",
   "Config.TeamAware.Set": "[MNCD] TeamAwareProtection ahora es {0}.",
   "Config.Radius.Set": "[MNCD] EntityRadius (burbuja de decaimiento del TC) ahora es {0} metros.",
@@ -26,45 +24,31 @@
   "Config.WipeMode.Set": "[MNCD] WipeModeOverride configurado a '{0}'. WipeMode activo ahora es {1}, AutoDetect desactivado.",
   "Config.WipeStartNow.Set": "[MNCD] WipeStartUnixTime establecido a ahora. WipeMode: {0}. Tiempo restante de wipe: {1}.",
   "Config.UIReset.Set": "[MNCD] Anclas de UI reiniciadas a los valores por defecto. Abre de nuevo un armario de herramientas para ver la nueva posición.",
-  "Config.UIAdd.Set": "[MNCD] Anclas de UI desplazadas por Δ({0}, {1}). Nuevo Min({2}, {3}) Max({4}, {5}).",
-
+  "Config.UIAdd.Set": "[MNCD] Anclas de UI desplazadas por ({0}, {1}). Nuevo Min({2}, {3}) Max({4}, {5}).",
   "TcLoot.NoRemaining": "[MNCD] El radio de este TC está completamente protegido del decaimiento por ModernNoCupboardDecay.\nCalendario de wipe: {0}. Fin del wipe no calculado (manual o sin datos).",
   "TcLoot.WithRemaining": "[MNCD] El radio de este TC está completamente protegido del decaimiento por ModernNoCupboardDecay.\nCalendario de wipe: {0}. El wipe termina en: {1}.",
-
   "UI.WipeTitle": "ModernNoCupboardDecay",
-  "UI.WipeLine": "Wipe: {0} – {1} restante",
+  "UI.WipeLine": "Wipe: {0} - {1} restante",
   "UI.WipeExtra": "Decaimiento desactivado dentro de este radio del armario de herramientas.",
-
   "UIAnchor.Usage.Chat": "[MNCD] Uso: /mncdui <minX> <minY> <maxX> <maxY>",
   "UIAnchor.Usage.Console": "[MNCD] Uso: mncd.ui <minX> <minY> <maxX> <maxY>",
   "UIAnchor.Set": "[MNCD] Ancla de UI establecida: Min({0}, {1})  Max({2}, {3})",
   "UIAnchor.Error.Numeric": "[MNCD] Los 4 valores deben ser numéricos.",
   "UIAnchor.Error.Order": "[MNCD] Se requiere que minX < maxX y minY < maxY.",
-
   "Debug.Enabled": "[MNCD] Superposición de depuración activada. Mostrará si ESTÁS dentro de una zona protegida por MNCD.",
   "Debug.Disabled": "[MNCD] Superposición de depuración desactivada.",
   "Debug.UI.Protected": "MNCD: Protegido",
   "Debug.UI.NotProtected": "MNCD: Sin protección",
-
   "Preview.NoTC": "[MNCD] No se encontraron armarios de herramientas cercanos. Nada que previsualizar.",
   "Preview.Drawn": "[MNCD] Dibujando anillos de protección de TC para {0} armarios durante {1} segundos (radio {2} m).",
   "Preview.NoPerm": "[MNCD] No tienes permiso para usar /mncdpreview.",
-
   "Help.Header": "[MNCD] ModernNoCupboardDecay v{0}",
-
   "Help.General": "ModernNoCupboardDecay evita el decaimiento de entidades dentro del radio del armario de herramientas y muestra información del wipe.\nComandos básicos:\n  /mncd               - Muestra el estado del plugin.\n  /mncdhelp [tema]    - Muestra ayuda. Temas: basic, ui, set, debug, preview, wipe.\n  /mncdpreview        - Dibuja anillos de protección del TC (holograma).\n  /mncddebug          - Activa/desactiva tu superposición personal de estado de protección.\nComandos de admin:\n  /mncdset            - Configuración en vivo (radio, auth, modo de wipe).\n  /mncdui, /mncduiadd - Mueven el panel de UI del wipe.\n  /mncdresetui        - Restablece la posición del panel de UI.\nUsa '/mncdhelp <tema>' para más detalles. Ejemplo: /mncdhelp preview",
-
   "Help.UnknownTopic": "[MNCD] Tema de ayuda desconocido '{0}'. Temas válidos: basic, ui, set, debug, preview, wipe.",
-
-  "Help.Topic.basic": "Conceptos básicos de MNCD:\n• Todas las entidades dentro del radio configurado de un armario de herramientas están protegidas del decaimiento.\n• CheckAuth opcional: solo se protegen entidades del dueño autorizado en el TC (o su equipo).\n• TeamAwareProtection: si está activado, el equipo de Rust del dueño del TC y los autorizados también están cubiertos.\n• El tiempo de mantenimiento del TC se convierte en 'tiempo hasta el wipe' en la UI de MNCD.\nComandos útiles:\n  /mncd           - Muestra el radio actual, modo de wipe y estado.\n  /mncddebug      - Comprueba si estás dentro de una burbuja protegida.",
-
-  "Help.Topic.ui": "Posicionamiento de la UI:\n  /mncdui <minX> <minY> <maxX> <maxY>\n    • Establece las anclas del panel de UI del wipe (coordenadas normalizadas 0..1).\n    • Ejemplo: /mncdui 0.70 0.27 0.95 0.49\n  /mncduiadd <dx> <dy>\n    • Desplaza el panel de UI un poco.\n    • Ejemplo: /mncduiadd -0.02 0.10 lo mueve 2% a la izquierda, 10% hacia arriba.\n  /mncdresetui\n    • Restablece la UI a la posición superior central por defecto.\nNotas:\n  • Requiere admin o el permiso 'modernnocupboarddecay.admin'.\n  • Después de cambiar la UI, vuelve a abrir el TC para actualizar el panel.",
-
-  "Help.Topic.set": "Configuración en vivo: /mncdset y mncd.set\n\nChat (admin):\n  /mncdset <opción> <valor>\nConsola/RCON:\n  mncd.set <opción> <valor>\n\nOpciones:\n  checkauth <true|false>\n    • true  => solo se protegen entidades de jugadores autorizados en el TC (y equipos opcionales).\n    • false => se protege cualquier cosa cerca del TC.\n  teamaware <true|false>\n    • Cuando checkauth es true, también protege a los compañeros de equipo del dueño/autorizados.\n  radius <metros>\n    • Establece el radio de protección del TC. Ejemplo: /mncdset radius 30\n  autodetect <true|false>\n    • true  => detecta el calendario de wipe desde server.tags (weekly, monthly, 5d, etc.).\n    • false => usa WipeModeOverride.\n  wipemode <Manual|Weekly|BiWeekly|Monthly|Nd>\n    • Ejemplo: /mncdset wipemode 5d (para wipes de 5 días).\n  wipestartnow\n    • Restablece la hora de inicio del wipe a ahora. Útil si cambias el calendario en mitad del wipe.\n",
-
-  "Help.Topic.debug": "Superposición de depuración: /mncddebug y mncd.debug\n\n  /mncddebug\n    • Activa/desactiva un pequeño panel de texto en la parte superior de la pantalla:\n      'MNCD: Protegido'     => estás dentro del radio protegido del TC.\n      'MNCD: Sin protección' => estás fuera de la protección MNCD.\n  mncd.debug (consola)\n    • Igual que /mncddebug, pero desde la consola F1 para ese jugador.\n\nNotas:\n  • Requiere admin o el permiso 'modernnocupboarddecay.debug'.\n  • Se actualiza cada 0.5 segundos mientras está activo.\n  • Se detiene y limpia automáticamente cuando te desconectas.",
-
-  "Help.Topic.preview": "Anillos de previsualización del TC: /mncdpreview y mncd.preview\n\n  /mncdpreview\n    • Dibuja esferas 'holográficas' alrededor de todos los armarios de herramientas.\n    • Usa el EntityRadius configurado (multiplicado opcionalmente por PreviewRingRadiusMultiplier).\n    • Solo tú ves los anillos; son ddraw del cliente.\n\n  mncd.preview (consola)\n    • El mismo efecto, ejecutado desde la consola F1.\n\nConfiguración:\n  PreviewRequiresPermission\n    • false (por defecto) => todos pueden usar /mncdpreview.\n    • true                => requiere el permiso 'modernnocupboarddecay.preview' o admin.\n  PreviewRingDuration\n    • Cuánto tiempo son visibles los anillos (segundos).\n  PreviewRingRadiusMultiplier\n    • Multiplica EntityRadius solo para el anillo visual.\n",
-
-  "Help.Topic.wipe": "Modos de wipe y temporizador de wipe:\n\nDetección:\n  • AutoDetectWipeFromTags = true:\n    - Lee ConVar.Server.tags para palabras clave: weekly, biweekly, monthly.\n    - También soporta patrones como '5d', '5day', '5days' para wipes personalizados de N días.\n  • AutoDetectWipeFromTags = false:\n    - Usa WipeModeOverride del config o /mncdset wipemode.\n\nModos soportados:\n  Manual      => sin hora de fin automática.\n  Weekly      => wipes de 7 días.\n  BiWeekly    => wipes de 14 días.\n  Monthly     => wipes de 30 días (longitud fija).\n  Nd (Custom) => por ejemplo '5d' => wipes de 5 días.\n\nInicio del wipe:\n  • OnNewSave (mapa/wipe) establece automáticamente WipeStartUnixTime.\n  • /mncdset wipestartnow puede restablecer manualmente el inicio del wipe.\n\nUI del TC:\n  • Al abrir un TC, MNCD muestra 'Wipe: <modo> – <tiempo restante>'.\n  • Si el modo es Manual o no se puede calcular, muestra N/A."
+  "Help.Topic.basic": "Conceptos básicos de MNCD:\n- Todas las entidades dentro del radio configurado de un armario de herramientas están protegidas del decaimiento.\n- CheckAuth opcional: solo se protegen entidades del dueño autorizado en el TC (o su equipo).\n- TeamAwareProtection: si está activado, el equipo de Rust del dueño del TC y los autorizados también están cubiertos.\n- El tiempo de mantenimiento del TC se convierte en 'tiempo hasta el wipe' en la UI de MNCD.\nComandos útiles:\n  /mncd           - Muestra el radio actual, modo de wipe y estado.\n  /mncddebug      - Comprueba si estás dentro de una burbuja protegida.",
+  "Help.Topic.ui": "Posicionamiento de la UI:\n  /mncdui <minX> <minY> <maxX> <maxY>\n    - Establece las anclas del panel de UI del wipe (coordenadas normalizadas 0..1).\n    - Ejemplo: /mncdui 0.70 0.27 0.95 0.49\n  /mncduiadd <dx> <dy>\n    - Desplaza el panel de UI un poco.\n    - Ejemplo: /mncduiadd -0.02 0.10 lo mueve 2% a la izquierda, 10% hacia arriba.\n  /mncdresetui\n    - Restablece la UI a la posición superior central por defecto.\nNotas:\n  - Requiere admin o el permiso 'modernnocupboarddecay.admin'.\n  - Después de cambiar la UI, vuelve a abrir el TC para actualizar el panel.",
+  "Help.Topic.set": "Configuración en vivo: /mncdset y mncd.set\n\nChat (admin):\n  /mncdset <opción> <valor>\nConsola/RCON:\n  mncd.set <opción> <valor>\n\nOpciones:\n  checkauth <true|false>\n    - true  => solo se protegen entidades de jugadores autorizados en el TC (y equipos opcionales).\n    - false => se protege cualquier cosa cerca del TC.\n  teamaware <true|false>\n    - Cuando checkauth es true, también protege a los compañeros de equipo del dueño/autorizados.\n  radius <metros>\n    - Establece el radio de protección del TC. Ejemplo: /mncdset radius 30\n  autodetect <true|false>\n    - true  => detecta el calendario de wipe desde server.tags (weekly, monthly, 5d, etc.).\n    - false => usa WipeModeOverride.\n  wipemode <Manual|Weekly|BiWeekly|Monthly|Nd>\n    - Ejemplo: /mncdset wipemode 5d (para wipes de 5 días).\n  wipestartnow\n    - Restablece la hora de inicio del wipe a ahora. Útil si cambias el calendario en mitad del wipe.",
+  "Help.Topic.debug": "Superposición de depuración: /mncddebug y mncd.debug\n\n  /mncddebug\n    - Activa/desactiva un pequeño panel de texto en la parte superior de la pantalla:\n      'MNCD: Protegido'     => estás dentro del radio protegido del TC.\n      'MNCD: Sin protección' => estás fuera de la protección MNCD.\n  mncd.debug (consola)\n    - Igual que /mncddebug, pero desde la consola F1 para ese jugador.\n\nNotas:\n  - Requiere admin o el permiso 'modernnocupboarddecay.debug'.\n  - Se actualiza cada 0.5 segundos mientras está activo.\n  - Se detiene y limpia automáticamente cuando te desconectas.",
+  "Help.Topic.preview": "Anillos de previsualización del TC: /mncdpreview y mncd.preview\n\n  /mncdpreview\n    - Dibuja esferas 'holográficas' alrededor de todos los armarios de herramientas.\n    - Usa el EntityRadius configurado (multiplicado opcionalmente por PreviewRingRadiusMultiplier).\n    - Solo tú ves los anillos; son ddraw del cliente.\n\n  mncd.preview (consola)\n    - El mismo efecto, ejecutado desde la consola F1.\n\nConfiguración:\n  PreviewRequiresPermission\n    - false (por defecto) => todos pueden usar /mncdpreview.\n    - true                => requiere el permiso 'modernnocupboarddecay.preview' o admin.\n  PreviewRingDuration\n    - Cuánto tiempo son visibles los anillos (segundos).\n  PreviewRingRadiusMultiplier\n    - Multiplica EntityRadius solo para el anillo visual.",
+  "Help.Topic.wipe": "Modos de wipe y temporizador de wipe:\n\nDetección:\n  - AutoDetectWipeFromTags = true:\n    - Lee ConVar.Server.tags para palabras clave: weekly, biweekly, monthly.\n    - También soporta patrones como '5d', '5day', '5days' para wipes personalizados de N días.\n  - AutoDetectWipeFromTags = false:\n    - Usa WipeModeOverride del config o /mncdset wipemode.\n\nModos soportados:\n  Manual      => sin hora de fin automática.\n  Weekly      => wipes de 7 días.\n  BiWeekly    => wipes de 14 días.\n  Monthly     => wipes de 30 días (longitud fija).\n  Nd (Custom) => por ejemplo '5d' => wipes de 5 días.\n\nInicio del wipe:\n  - OnNewSave (mapa/wipe) establece automáticamente WipeStartUnixTime.\n  - /mncdset wipestartnow puede restablecer manualmente el inicio del wipe.\n\nUI del TC:\n  - Al abrir un TC, MNCD muestra 'Wipe: <modo> - <tiempo restante>'.\n  - Si el modo es Manual o no se puede calcular, muestra N/A."
 }

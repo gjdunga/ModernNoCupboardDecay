@@ -3,6 +3,76 @@ All notable changes to this project are documented here.
 
 ---
 
+## [5.2.0] – Version alignment and documentation pass
+
+Bumps all support files (manifest.json, .umod.yaml, README.md) to match the
+plugin source version.  No functional code changes from 5.1.0.
+
+### Changed
+- `manifest.json` version field: 5.0.0 → 5.2.0.
+- `.umod.yaml` version field: 4.0.0 → 5.2.0; permissions table completed with
+  all three nodes (admin, debug, preview).
+- `README.md` rewritten to reflect 5.x command set, config table updated with
+  `PreviewCooldownSeconds` (new in 5.1.0), and RCON audit note added.
+
+---
+
+## [5.1.0] – Security hardening
+
+Full security audit and refactor.  All issues from the code review addressed.
+
+### Fixed (security)
+- **C1** `HitBuffer` was a `static` field shared across all
+  `Physics.OverlapSphereNonAlloc` calls.  Converted to an instance field;
+  concurrent decay hooks and debug-overlay timer ticks no longer share the
+  same buffer.
+- **C2** `mncd.set` from RCON / server console bypassed permission checks
+  silently.  Behaviour is unchanged (RCON is trusted), but every change is now
+  logged to the server console for auditability.
+- **C3** `/mncdpreview` iterated all of `BaseNetworkable.serverEntities` with
+  no rate limit.  Added `PreviewCooldownSeconds` config key (default 15 s,
+  clamp 5–300 s) enforced per-player via `_previewLastUsed` dictionary.
+- **H1** `SetUiAnchors` did not clamp floats to `[0, 1]`.  Replaced with
+  `WriteAnchorsSafe` which clamps all four inputs before writing to config.
+- **H2** `ApplyUiOffset` could produce a zero-width/zero-height panel at the
+  edge of the normalized range.  `WriteAnchorsSafe` now enforces a minimum
+  panel dimension of 0.05 in both axes.
+- **H3** `WipeModeOverride` stored raw user input with no sanitisation.
+  `SanitiseWipeModeString` now filters to printable ASCII, truncates at 64
+  characters, and falls back to "Manual" on empty input.  Called on config
+  load and before every `wipemode` change.
+- **H4** Debug overlay timer closed over a `BasePlayer` reference.  Rust uses
+  object pooling; a disconnected player's object can be reused for a different
+  connection without the reference going null.  Timer closure now captures only
+  `ulong userID` and calls `BasePlayer.FindByID(userId)` on each tick.
+- **M1** `UiBackgroundColor` and `UiTextColor` were passed to CUI JSON without
+  validation.  `IsValidCuiColor` now validates both as four space-separated
+  floats in `[0, 1]` during `ValidateConfig`; invalid values are replaced with
+  safe defaults.
+- **M2** `HitBuffer` size raised from 512 to 1024.  A `PrintWarning` is
+  emitted when the result count equals the buffer length (silent truncation
+  previously hid TC misses in dense bases).
+- **M3** `IsPositionProtected` now explicitly guards `_config == null` instead
+  of relying implicitly on the `_initialized` flag.
+- **M4** Tag detection checked `"weekly"` before `"biweekly"`.  Because
+  `"biweekly".Contains("weekly")` is true, servers tagged `"biweekly"` were
+  misidentified as Weekly.  Check order reversed.
+- **M5** `ApplyConfigChange` for `wipemode` mutated and saved config before
+  validating the new value.  Now parses and validates first; a bad value
+  returns an error without touching the saved config.
+
+### Added
+- `PreviewCooldownSeconds` config key (default 15 s).
+
+### Refactored
+- Duplicate chat/console command handlers collapsed into shared implementation
+  methods (`HandleUiAnchorChange`, `HandleUiAddOffset`, `HandlePreview`).
+- `DisableDebugOverlay` overloaded to accept either `ulong` or `BasePlayer`.
+- Full XML `<summary>` doc coverage on every `private` method.
+- File header updated with complete security change log.
+
+---
+
 ## [5.0.0] – Oxide v2.0.7022 / Naval Update Compatibility
 
 Comprehensive refactor targeting Oxide v2.0.7022 and the Facepunch Rust Naval Update.
@@ -30,11 +100,10 @@ Tighter code, critical bug fixes, and performance improvements.
 
 ### Improved
 - **Zero-GC decay hot path** — Replaced `Physics.OverlapSphere` (allocates a new
-  `Collider[]` per call) with `Physics.OverlapSphereNonAlloc` and a static 512-element
+  `Collider[]` per call) with `Physics.OverlapSphereNonAlloc` and a pre-allocated
   buffer. Layer mask cached once in `OnServerInitialized` instead of recomputed per tick.
-- **Consolidated protection logic** — `IsEntityWithinCupboardProtection` and
-  `IsPlayerInProtectedZone` (duplicated ~80 lines) merged into single
-  `IsPositionProtected(Vector3, ulong)` method used by both decay prevention
+- **Consolidated protection logic** — Two near-duplicate protection methods merged
+  into single `IsPositionProtected(Vector3, ulong)` used by both decay prevention
   and debug overlay.
 - **TC preview allocation** — Replaced LINQ `.OfType<BuildingPrivlidge>().ToList()`
   with manual `foreach`/`as` iteration over `serverEntities`. No list allocation.
@@ -44,102 +113,39 @@ Tighter code, critical bug fixes, and performance improvements.
   plugin has not finished initialization, preventing early null config access.
 - **Removed unused `System.Linq` import** and trailing comment on using statements.
 - **Consistent field naming** — Private fields use underscore prefix convention.
-- **Leaner console command handlers** — Shared `Reply()` method and null-safe
-  `arg?.Args` patterns throughout.
 
 ### Compatibility
 - Verified against Oxide/uMod v2.0.7022 API surface.
-- All hook signatures match current Oxide expectations.
 - Naval update entities (boats, submarines, floating structures) are protected
-  by the existing radius-based `OverlapSphereNonAlloc` approach — no entity
-  type filtering means all decayable objects within TC range are covered.
+  by the existing radius-based `OverlapSphereNonAlloc` approach.
 
 ---
 
 ## [4.0.0] – The Feature Expansion Update
-ModernNoCupboardDecay has undergone a major evolution. This version introduces powerful new admin tools, player utilities, UI improvements, wipe intelligence, visuals, and multilingual support.
 
 ### Added
-- **TC Protection Preview (Hologram Rings)**  
-  Players can now visualize the decay protection radius with `/mncdpreview`.  
-  Uses Rust’s client-side ddraw system. Toggleable and permission-aware.
-
-- **Draggable / Adjustable Wipe UI Panel**  
-  Fully movable wipe timer using:  
-  `/mncdui`, `/mncduiadd`, `/mncdresetui`  
-
-- **Real-Time Debug Overlay**  
-  Players may toggle a status indicator (`MNCD: Protected / Not Protected`) using `/mncddebug`.
-
-- **Full Help System**  
-  New command `/mncdhelp`, along with topic-based help pages:  
-  `ui`, `set`, `debug`, `preview`, `wipe`
-
-- **Automatic Wipe Detection**  
-  Reads server tags to determine:  
-  - weekly  
-  - biweekly  
-  - monthly  
-  - ANY custom N-day wipe (e.g., 5d, 10d, 3d)  
-  Falls back to manual mode if overridden.
-
-- **New Runtime Config Commands**  
-  `/mncdset checkauth <bool>`  
-  `/mncdset teamaware <bool>`  
-  `/mncdset radius <meters>`  
-  `/mncdset autodetect <bool>`  
-  `/mncdset wipemode <mode>`  
-  `/mncdset wipestartnow`
-
-- **Localization Support**  
-  Full translations added for:  
-  - English  
-  - Spanish  
-  - Russian  
-  - Simplified Chinese  
-
-- **Better Logging, More Documentation, Cleaner Structure**  
-  Internal code rewritten for readability, maintainability, and uMod compliance.
+- TC Protection Preview (Hologram Rings) — `/mncdpreview`
+- Draggable / Adjustable Wipe UI Panel — `/mncdui`, `/mncduiadd`, `/mncdresetui`
+- Real-Time Debug Overlay — `/mncddebug`
+- Full Help System — `/mncdhelp` with topic-based pages
+- Automatic Wipe Detection from server.tags (weekly / biweekly / monthly / Nd)
+- New Runtime Config Commands via `/mncdset`
+- Localization for English, Spanish, Russian, Simplified Chinese
 
 ---
 
-## [3.x] – Modernization & Internal Overhaul
-### Added
-- Rebuilt decay protection logic to match new Rust entity behaviors  
-- Team-aware protection originally introduced  
-- Wipe UI panel created  
-- Initial configuration restructuring  
-- Updated decay handling for newly added Rust deployables (e.g., wallpaper)
+## [3.x] – Modernization and Internal Overhaul
 
-### Improved
-- Overall performance & hook stability  
-- Cleaner error handling  
-- Better config persistence
+Rebuilt decay logic, team-aware protection, wipe UI panel, and config structure.
 
 ---
 
 ## [2.x] – Compatibility Restoration
-### Added
-- Updated entity lists to include items introduced by recent Rust patches  
-- Improved checks for TC authorization  
-- More reliable decay-prevention logic
 
-### Fixed
-- Several decay exceptions caused by new deployable classes  
-- Plugins breaking after Facepunch API changes
+Updated entity lists and TC authorization checks for Rust patches.
 
 ---
 
 ## [1.x] – Initial Release
-### Added
-- Simple “no decay within TC radius” effect  
-- Basic configuration  
-- Minimal logging  
 
-This was the foundation for everything that followed.
-
----
-
-## Summary
-ModernNoCupboardDecay has grown into a **full control suite** for Rust decay behavior, wipe awareness, visual debugging, UI customization, and transparent gameplay communication.
-Version 5.0.0 refactors the core for Oxide v2.0.7022+ compatibility, fixes critical auth bugs, and optimizes the decay hot path for high-population servers.
+Simple no-decay-within-TC-radius effect with basic configuration.

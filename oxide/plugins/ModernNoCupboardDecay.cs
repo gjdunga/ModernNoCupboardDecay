@@ -1,5 +1,5 @@
 // ============================================================================
-// ModernNoCupboardDecay  v5.1.0
+// ModernNoCupboardDecay  v5.2.0
 // Author  : Gabriel (gjdunga)
 // License : MIT  –  see LICENSE.MD
 //
@@ -28,7 +28,7 @@
 //   Oxide / uMod  2.0.7022+
 //   Rust Naval Update  (ProtoBuf.PlayerNameID.userid auth list)
 //
-// Security notes (v5.1.0 changes)
+// Security notes (v5.1.0 / v5.2.0)
 // --------------------------------
 //   C1  HitBuffer is now an instance field.  The static field was shared
 //       across all concurrent Physics.OverlapSphereNonAlloc calls; under
@@ -84,7 +84,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("ModernNoCupboardDecay", "Gabriel", "5.1.0")]
+    [Info("ModernNoCupboardDecay", "Gabriel", "5.2.0")]
     [Description("Prevents decay within Tool Cupboard radius. Wipe-aware UI, team auth, debug tools. Oxide 2.0.7022+ / Naval Update compatible.")]
     public class ModernNoCupboardDecay : RustPlugin
     {

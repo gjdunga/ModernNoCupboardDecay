@@ -1,6 +1,6 @@
 name: ModernNoCupboardDecay
 title: Modern No Cupboard Decay
-version: 5.2.0
+version: 5.3.0
 author: Gabriel
 game: rust
 modloader: oxide
@@ -10,8 +10,8 @@ description: >
   Prevents decay for anything within Tool Cupboard radius. Supports TC auth
   and team-aware protection logic, provides a wipe-aware TC UI, draggable UI
   positioning, live runtime configuration, TC preview holograms, protection
-  debugging overlay, multi-language support, and automated wipe-schedule
-  detection (weekly / biweekly / monthly / custom N-day).
+  debugging overlay, multi-language support (en, es, ru, zh-CN, la), and
+  automated wipe-schedule detection (weekly / biweekly / monthly / custom N-day).
 
 language: C#
 category: building

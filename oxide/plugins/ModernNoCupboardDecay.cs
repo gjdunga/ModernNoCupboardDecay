@@ -801,11 +801,11 @@ namespace Oxide.Plugins
             if (!_initialized || _config == null || entity == null || info == null)
                 return null;
 
-            if (!info.damageTypes.Has(DamageType.Decay))
+            if (!info.damageTypes.Has(global::DamageType.Decay))
                 return null;
 
             if (IsPositionProtected(entity.transform.position, GetOwnerId(entity)))
-                info.damageTypes.Scale(DamageType.Decay, 0f);
+                info.damageTypes.Scale(global::DamageType.Decay, 0f);
 
             return null;
         }

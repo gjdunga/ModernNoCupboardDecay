@@ -896,9 +896,9 @@ namespace Oxide.Plugins
             var authList = priv.authorizedPlayers;
             if (authList != null)
             {
-                foreach (var entry in authList)
+                foreach (ulong authedId in authList)
                 {
-                    if (ownerTeam.members.Contains(entry.userid))
+                    if (ownerTeam.members.Contains(authedId))
                         return true;
                 }
             }
@@ -914,9 +914,9 @@ namespace Oxide.Plugins
             var authList = priv.authorizedPlayers;
             if (authList == null || authList.Count == 0) return false;
 
-            foreach (var entry in authList)
+            foreach (ulong authedId in authList)
             {
-                if (entry.userid == ownerId) return true;
+                if (authedId == ownerId) return true;
             }
             return false;
         }

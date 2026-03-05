@@ -58,6 +58,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Oxide.Game.Rust.Cui;
+using Rust;
 using UnityEngine;
 
 namespace Oxide.Plugins
@@ -801,11 +802,11 @@ namespace Oxide.Plugins
             if (!_initialized || _config == null || entity == null || info == null)
                 return null;
 
-            if (!info.damageTypes.Has(global::DamageType.Decay))
+            if (!info.damageTypes.Has(DamageType.Decay))
                 return null;
 
             if (IsPositionProtected(entity.transform.position, GetOwnerId(entity)))
-                info.damageTypes.Scale(global::DamageType.Decay, 0f);
+                info.damageTypes.Scale(DamageType.Decay, 0f);
 
             return null;
         }

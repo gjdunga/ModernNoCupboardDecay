@@ -1,5 +1,5 @@
 // ============================================================================
-// ModernNoCupboardDecay  v5.3.0
+// ModernNoCupboardDecay  v5.3.1
 // Author  : Gabriel (gjdunga)
 // License : MIT  –  see LICENSE.MD
 //
@@ -36,7 +36,7 @@
 //
 // Security change log (full history in CHANGELOG.md)
 // ---------------------------------------------------
-//   v5.3.0
+//   v5.3.1
 //     S1  OnLootEntity now guards _initialized / _config == null before any
 //         wipe-mode or remaining-time access, matching the same defensive
 //         pattern already in OnEntityTakeDamage.
@@ -63,7 +63,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("ModernNoCupboardDecay", "Gabriel", "5.3.0")]
+    [Info("ModernNoCupboardDecay", "Gabriel", "5.3.1")]
     [Description("Prevents decay within Tool Cupboard radius. Wipe-aware UI, team auth, debug tools. Oxide 2.0.7022+ / Naval Update compatible.")]
     public class ModernNoCupboardDecay : RustPlugin
     {
@@ -104,13 +104,13 @@ namespace Oxide.Plugins
         // hooks and debug-overlay timers in the same Oxide frame would corrupt
         // each other's result counts.
         //
-        // Size 2048: OverlapSphereNonAlloc silently truncates at buffer length.
+        // Size 4086: OverlapSphereNonAlloc silently truncates at buffer length.
         // Mask is intentionally narrow ("Deployed" only): BuildingPrivlidge lives
         // on the Deployed layer. Including Construction/Trigger layers adds
         // thousands of irrelevant colliders per dense base, saturating the buffer
         // without contributing a single TC match.
         // A server-console warning is emitted when the limit is reached.
-        private readonly Collider[] _hitBuffer = new Collider[2048];
+        private readonly Collider[] _hitBuffer = new Collider[4086];
 
         /// <summary>Set of userIDs that currently have the debug overlay active.</summary>
         private readonly HashSet<ulong> _debugUsers = new HashSet<ulong>();
@@ -365,7 +365,7 @@ namespace Oxide.Plugins
                 ["Error.WipeModeValue"]     = "[MNCD] wipemode requires: Manual, Weekly, BiWeekly, Monthly, or a day count like 5d.",
                 ["Error.BoolExpected"]      = "[MNCD] {0} requires true or false.",
 
-                // Preview cooldown  (SECURITY S3 / v5.3.0: was missing from lang JSON files)
+                // Preview cooldown  (SECURITY S3 / v5.3.1: was missing from lang JSON files)
                 ["Preview.Cooldown"] = "[MNCD] Please wait {0} more seconds before using /mncdpreview again.",
 
                 // Usage
@@ -753,7 +753,7 @@ namespace Oxide.Plugins
         /// Returns a human-readable wipe mode string, including day count
         /// for CustomDays.
         ///
-        /// SECURITY (S2 / v5.3.0): Guards _config == null so a CustomDays
+        /// SECURITY (S2 / v5.3.1): Guards _config == null so a CustomDays
         /// lookup cannot throw NullReferenceException if called before
         /// OnServerInitialized completes.
         /// </summary>
@@ -1794,7 +1794,7 @@ namespace Oxide.Plugins
         /// Oxide hook: called when a player opens any entity's loot panel.
         /// When the entity is a BuildingPrivlidge (TC), shows the wipe-timer panel.
         ///
-        /// SECURITY (S1 / v5.3.0): Guards _initialized and _config == null before
+        /// SECURITY (S1 / v5.3.1): Guards _initialized and _config == null before
         /// any wipe-mode or remaining-time access, matching OnEntityTakeDamage.
         /// </summary>
         private void OnLootEntity(BasePlayer player, BaseEntity entity)

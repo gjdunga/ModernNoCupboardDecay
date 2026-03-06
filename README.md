@@ -1,4 +1,4 @@
-# ModernNoCupboardDecay v5.3.0 — Administrator Guide
+# ModernNoCupboardDecay v5.3.1 — Administrator Guide
 
 Prevents decay for all building blocks and deployables within any Tool Cupboard
 radius.  Includes wipe-timer UI, team-aware auth, debug overlay, TC preview

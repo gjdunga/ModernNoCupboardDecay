@@ -3,6 +3,37 @@ All notable changes to this project are documented here.
 
 ---
 
+## [5.3.1] – Rust API compatibility fixes and physics query hardening
+
+### Fixed (compilation)
+- **DamageType namespace:** Added `using Rust;` directive to resolve `DamageType.Decay`
+  inside `namespace Oxide.Plugins`. Prior attempt used `global::DamageType` which pointed
+  to the C# root namespace; the type lives under `namespace Rust` in the Facepunch assembly,
+  not at root, so that made the error worse. Correct fix is the using directive.
+- **authorizedPlayers iteration:** `BuildingPrivlidge.authorizedPlayers` is now
+  `HashSet<ulong>` in current Rust (not `List<ProtoBuf.PlayerNameID>` as documented in the
+  Naval Update notes). Removed indexed for-loops (HashSet has no indexer) and removed
+  `.userid` field access (entries are raw Steam64 IDs). Both `IsOwnerAuthorizedOrTeammate`
+  and `IsAuthorizedOnCupboard` now use `foreach (ulong authedId in authList)` with direct
+  comparison.
+
+### Fixed (runtime)
+- **_protectionMask narrowed to "Deployed" only:** Previous mask included Construction,
+  Construction Trigger, and Trigger layers. BuildingPrivlidge is on the Deployed layer
+  exclusively. The broader mask caused OverlapSphereNonAlloc to fill the buffer with
+  building block and trigger volume colliders before reaching any TCs, saturating the
+  HitBuffer at 1024 on dense bases and producing false-miss warnings. Narrowing to
+  Deployed eliminates irrelevant collider hits while retaining all TC matches.
+
+### Changed
+- **HitBuffer raised to 4086:** Appropriate for build/PVE servers with high deployable
+  density. Previous values: 512 (original), 1024 (v5.1.0 M2 fix), 2048 (interim).
+  4086 gives adequate headroom for large player builds within a 30m radius sphere on
+  a low-wipe PVE server without meaningful memory cost.
+- Version synced to 5.3.1 across `plugin.cs`, `manifest.json`, `README.md`, `.umod.yaml`.
+
+---
+
 ## [5.3.0] – Security audit, Latin translation, structural fixes
 
 ### Fixed (security)

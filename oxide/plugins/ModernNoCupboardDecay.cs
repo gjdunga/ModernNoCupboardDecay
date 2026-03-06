@@ -104,10 +104,13 @@ namespace Oxide.Plugins
         // hooks and debug-overlay timers in the same Oxide frame would corrupt
         // each other's result counts.
         //
-        // Size 1024: OverlapSphereNonAlloc silently truncates at buffer length.
-        // A server-console warning is emitted when the limit is reached so
-        // operators know to increase it in the source if needed.
-        private readonly Collider[] _hitBuffer = new Collider[1024];
+        // Size 2048: OverlapSphereNonAlloc silently truncates at buffer length.
+        // Mask is intentionally narrow ("Deployed" only): BuildingPrivlidge lives
+        // on the Deployed layer. Including Construction/Trigger layers adds
+        // thousands of irrelevant colliders per dense base, saturating the buffer
+        // without contributing a single TC match.
+        // A server-console warning is emitted when the limit is reached.
+        private readonly Collider[] _hitBuffer = new Collider[2048];
 
         /// <summary>Set of userIDs that currently have the debug overlay active.</summary>
         private readonly HashSet<ulong> _debugUsers = new HashSet<ulong>();
@@ -511,8 +514,7 @@ namespace Oxide.Plugins
         {
             try
             {
-                _protectionMask = LayerMask.GetMask(
-                    "Construction", "Construction Trigger", "Trigger", "Deployed");
+                _protectionMask = LayerMask.GetMask("Deployed");
 
                 LoadConfigData();
                 DetectWipeModeFromTagsOrConfig();

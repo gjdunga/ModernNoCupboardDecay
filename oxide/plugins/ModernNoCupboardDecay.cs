@@ -1,5 +1,5 @@
 // ============================================================================
-// ModernNoCupboardDecay  v5.3.1
+// ModernNoCupboardDecay  v5.3.2
 // Author  : Gabriel (gjdunga)
 // License : MIT  –  see LICENSE.MD
 //
@@ -27,6 +27,7 @@
 // -------------
 //   Oxide / uMod  2.0.7022+
 //   Rust Naval Update  (ProtoBuf.PlayerNameID.userid auth list)
+//   Rust Community Update 268 (Oxide 2.0.7182) -- verified compatible, no API changes
 //
 // Value-tuple policy
 // ------------------
@@ -51,7 +52,11 @@
 //     S5  Sample config moved from oxide/oxide/config/ (doubly-nested path)
 //         to oxide/config/ (correct Oxide layout).
 //
-//   v5.2.0 / v5.1.0  – see CHANGELOG.md for full history
+//   v5.3.2
+//     Verified compatible with Oxide 2.0.7182 (Rust Community Update 268).
+//     No hook signature changes; no code changes required.
+//
+//   v5.2.0 / v5.1.0  -- see CHANGELOG.md for full history
 // ============================================================================
 
 using System;
@@ -63,7 +68,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("ModernNoCupboardDecay", "Gabriel", "5.3.1")]
+    [Info("ModernNoCupboardDecay", "Gabriel", "5.3.2")]
     [Description("Prevents decay within Tool Cupboard radius. Wipe-aware UI, team auth, debug tools. Oxide 2.0.7022+ / Naval Update compatible.")]
     public class ModernNoCupboardDecay : RustPlugin
     {

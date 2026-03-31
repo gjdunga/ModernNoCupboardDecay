@@ -1,4 +1,34 @@
-# ModernNoCupboardDecay — Changelog
+# ModernNoCupboardDecay -- Changelog
+All notable changes to this project are documented here.
+
+---
+
+## [5.3.2] -- 2026-03-30
+
+### Compatibility
+
+- Verified compatible with Oxide 2.0.7182 (Rust Community Update 268). No hook
+  signature changes were introduced between Oxide 2.0.7022 and 2.0.7182 that
+  affect this plugin. All hooks (OnEntityTakeDamage, OnLootEntity, OnLootEntityEnd,
+  OnPlayerDisconnected, OnNewSave, OnServerInitialized, Init, Unload) remain
+  correct. The authorizedPlayers HashSet<ulong> pattern, DamageType.Decay via
+  using Rust, BuildingPrivlidge.GetComponentInParent, and
+  Physics.OverlapSphereNonAlloc signatures are all unchanged.
+- Compatibility note added to plugin file header and README.
+
+### Documentation
+
+- README.md compatibility line updated to include Rust Community Update 268
+  and Oxide 2.0.7182.
+- INSTALL.md created (was absent from repository).
+
+### No Code Changes
+
+No functional, security, or performance changes. This is a documentation and
+compatibility-verification release only.
+
+---
+
 All notable changes to this project are documented here.
 
 ---

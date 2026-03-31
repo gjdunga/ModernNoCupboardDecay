@@ -1,10 +1,11 @@
-# ModernNoCupboardDecay v5.3.1 — Administrator Guide
+# ModernNoCupboardDecay v5.3.2 -- Administrator Guide
 
 Prevents decay for all building blocks and deployables within any Tool Cupboard
 radius.  Includes wipe-timer UI, team-aware auth, debug overlay, TC preview
 holograms, live config editing, and multi-language support.
 
-Requires Oxide / uMod 2.0.7022+  |  Compatible with the Rust Naval Update.
+Requires Oxide / uMod 2.0.7022+  |  Compatible with Naval Update and Community Update 268 (Oxide 2.0.7182).
+
 
 ---
 

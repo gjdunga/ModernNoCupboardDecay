@@ -86,6 +86,12 @@ wipe mode, and remaining wipe time.  `/mncdhelp` lists every command and topic.
 Use `/mncdpreview` in-game to see the TC protection radius as a hologram ring around any
 nearby Tool Cupboard.
 
+For live "am I inside a protected bubble?" feedback, toggle the debug overlay with
+`/mncddebug` (note the leading **mncd**, not `mcd`).  The banner reads
+**MNCD: Protected** when you are inside any TC's decay-protection radius and
+**MNCD: Not Protected** otherwise, refreshing every 0.5 s.  Requires admin or
+the `modernnocupboarddecay.debug` permission.  Console / F1 equivalent: `mncd.debug`.
+
 ## Updating
 
 Replace `ModernNoCupboardDecay.cs` and reload:

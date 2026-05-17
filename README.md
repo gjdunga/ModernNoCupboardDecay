@@ -1,131 +1,119 @@
-# ModernNoCupboardDecay v5.3.3 -- Administrator Guide
+# ModernNoCupboardDecay
 
-Maintained by **Gabriel Dungan** -- DunganSoft Technologies.
+**v5.3.3** &middot; Oxide / uMod plugin for Rust &middot; MIT license
 
-Prevents decay for all building blocks and deployables within any Tool Cupboard
-radius.  Includes wipe-timer UI, team-aware auth, debug overlay, TC preview
-holograms, live config editing, and multi-language support.
+Maintained by **Gabriel Dungan** &mdash; DunganSoft Technologies.
 
-Requires Oxide / uMod 2.0.7022+  |  Verified against Oxide 2.0.7338 (May 2026 Rust patch series).
+Stops decay on every building block and deployable inside a Tool Cupboard's
+protection radius. Ships with a wipe-timer panel, team-aware authorization,
+admin debug overlay, TC preview holograms, live config editing, and translations
+for English, Spanish, Russian, Simplified Chinese, and Latin.
 
-
----
-
-## Permissions
-
-| Node | Purpose |
+| | |
 |---|---|
-| `modernnocupboarddecay.admin` | `/mncdset`, `/mncdui`, `/mncduiadd`, `/mncdresetui` |
-| `modernnocupboarddecay.debug` | `/mncddebug` protection-status overlay |
-| `modernnocupboarddecay.preview` | `/mncdpreview` (when `PreviewRequiresPermission = true`) |
+| Requires | Oxide / uMod **2.0.7022+** |
+| Verified | Oxide **2.0.7338** (May 2026 Rust patch series) |
+| Install | [`INSTALL.md`](./INSTALL.md) |
+| Changes | [`CHANGELOG.md`](./CHANGELOG.md) |
+| Contribute | [`CONTRIBUTING.md`](./CONTRIBUTING.md) |
 
 ---
 
 ## Commands
 
-### Status and help
+| Command | Console | Who | What it does |
+|---|---|---|---|
+| `/mncd` | `mncd` | anyone | Show plugin status. |
+| `/mncdhelp [topic]` | `mncd.help` | anyone | Help. Topics: `basic`, `ui`, `set`, `debug`, `preview`, `wipe`. |
+| `/mncdpreview` | `mncd.preview` | anyone* | Draw client-side rings around every TC. |
+| `/mncddebug` | `mncd.debug` | admin / `.debug` | Toggle the **MNCD: Protected / Not Protected** banner. |
+| `/mncdset <opt> <value>` | `mncd.set` | admin | Live config edit. See table below. |
+| `/mncdui <minX> <minY> <maxX> <maxY>` | `mncd.ui` | admin | Set wipe-panel anchors (0..1 normalized). |
+| `/mncduiadd <dx> <dy>` | `mncd.uiadd` | admin | Nudge wipe-panel position. |
+| `/mncdresetui` | `mncd.resetui` | admin | Reset wipe panel to default top-center. |
 
-```
-/mncd                   Show plugin status (radius, wipe mode, state).
-/mncdhelp [topic]       In-game help. Topics: basic, ui, set, debug, preview, wipe.
-```
+*`/mncdpreview` is open to everyone by default but is rate-limited per player
+(`PreviewCooldownSeconds`, default 15 s). Set `PreviewRequiresPermission = true`
+to gate it on `modernnocupboarddecay.preview`.
 
-### Live configuration (admin)
+### `/mncdset` options
 
-```
-/mncdset <option> <value>
-```
-
-| Option | Values | Description |
+| Option | Value | Effect |
 |---|---|---|
-| `checkauth` | true/false | Require TC authorization to protect entities. |
-| `teamaware` | true/false | Protect Rust-team members of authed players (needs checkauth). |
-| `radius` | 1-500 | TC protection bubble radius in meters. |
-| `autodetect` | true/false | Read wipe schedule from server.tags automatically. |
-| `wipemode` | Manual/Weekly/BiWeekly/Monthly/Nd | Set wipe schedule (e.g. `5d`). |
-| `wipestartnow` | — | Reset wipe start timestamp to now. |
+| `checkauth` | true / false | Require TC authorization for protection. |
+| `teamaware` | true / false | Also protect Rust-team members (needs `checkauth = true`). |
+| `radius` | 1 .. 500 | Protection bubble radius in meters. |
+| `autodetect` | true / false | Read wipe schedule from `server.tags`. |
+| `wipemode` | `Manual` / `Weekly` / `BiWeekly` / `Monthly` / `Nd` (e.g. `5d`) | Wipe schedule. Disables `autodetect`. |
+| `wipestartnow` | &mdash; | Reset wipe start to now. |
 
-Console / RCON equivalent: `mncd.set <option> <value>`
-All RCON changes are logged to the server console for auditability.
-
-### UI positioning (admin)
-
-```
-/mncdui <minX> <minY> <maxX> <maxY>   Set panel anchors (normalized 0-1).
-/mncduiadd <dx> <dy>                  Nudge panel position.
-/mncdresetui                          Reset to default top-center position.
-```
-
-Reopen a TC after changing position to refresh the panel.
-
-### TC radius preview
-
-```
-/mncdpreview    Draw client-side spheres around every TC's protection bubble.
-mncd.preview    Same, from the F1 console.
-```
-
-Subject to `PreviewCooldownSeconds` (default 15 s) per player.
-Optional permission gate: set `PreviewRequiresPermission = true` in config.
-
-### Protection-status debug overlay
-
-```
-/mncddebug    Toggle "MNCD: Protected / Not Protected" banner.
-mncd.debug    Same, from the F1 console.
-```
-
-Updates every 0.5 s. Requires admin or `modernnocupboarddecay.debug`.
-Automatically stops and cleans up on disconnect.
+Console / RCON form: `mncd.set <opt> <value>`. Every RCON change is echoed to
+the server log for auditability.
 
 ---
 
-## Configuration keys (oxide/config/ModernNoCupboardDecay.json)
+## Permissions
 
-| Key | Default | Description |
+| Node | Grants |
+|---|---|
+| `modernnocupboarddecay.admin` | `/mncdset`, `/mncdui`, `/mncduiadd`, `/mncdresetui` |
+| `modernnocupboarddecay.debug` | `/mncddebug` overlay |
+| `modernnocupboarddecay.preview` | `/mncdpreview` (only when `PreviewRequiresPermission = true`) |
+
+Server admins implicitly satisfy every node.
+
+---
+
+## Configuration
+
+File: `oxide/config/ModernNoCupboardDecay.json` (created on first load).
+
+| Key | Default | Notes |
 |---|---|---|
-| `CheckAuth` | false | Auth-mode protection. |
-| `TeamAwareProtection` | true | Extend auth-mode to Rust team members. |
-| `EntityRadius` | 30 | TC bubble radius (meters, 1-500). |
-| `AutoDetectWipeFromTags` | true | Detect wipe schedule from server.tags. |
-| `WipeModeOverride` | "Manual" | Fallback wipe mode. |
-| `CustomWipeDays` | 0 | Days for custom wipe mode. |
-| `WipeStartUnixTime` | 0 | UTC epoch of wipe start (auto-set on wipe). |
-| `EnableTcWipeUI` | true | Show wipe-timer panel when opening a TC. |
-| `UiBackgroundColor` | "0.05 0.05 0.05 0.85" | Panel background (R G B A). |
-| `UiTextColor` | "0.9 0.9 0.9 1.0" | Panel text color (R G B A). |
-| `UiAnchorMin` | "0.4 0.92" | Panel bottom-left anchor. |
-| `UiAnchorMax` | "0.6 0.98" | Panel top-right anchor. |
-| `PreviewRequiresPermission` | false | Gate /mncdpreview on permission node. |
-| `PreviewCooldownSeconds` | 15 | Minimum seconds between /mncdpreview calls per player. |
-| `PreviewRingDuration` | 30 | Seconds preview spheres remain visible. |
-| `PreviewRingRadiusMultiplier` | 1.0 | Scale EntityRadius for visual ring only. |
+| `CheckAuth` | `false` | When true, only entities owned by TC-authed players are protected. |
+| `TeamAwareProtection` | `true` | Extends `CheckAuth` to the owner's Rust team. |
+| `EntityRadius` | `30.0` | Bubble radius in meters. Clamped to `[1, 500]`. |
+| `AutoDetectWipeFromTags` | `true` | Reads `server.tags` for `weekly` / `biweekly` / `monthly` / `Nd`. |
+| `WipeModeOverride` | `"Manual"` | Used when auto-detect is off or finds nothing. |
+| `CustomWipeDays` | `0` | Day count for `CustomDays` mode. Clamped to `[0, 365]`. |
+| `WipeStartUnixTime` | `0` | UTC epoch of current wipe start. Auto-set on `OnNewSave`. |
+| `EnableTcWipeUI` | `true` | Show the wipe-timer CUI panel when a TC is opened. |
+| `UiBackgroundColor` | `"0.05 0.05 0.05 0.85"` | `R G B A`, each in `[0, 1]`. |
+| `UiTextColor` | `"0.9 0.9 0.9 1.0"` | `R G B A`, each in `[0, 1]`. |
+| `UiAnchorMin` | `"0.4 0.92"` | Panel bottom-left, normalized `[0, 1]`. |
+| `UiAnchorMax` | `"0.6 0.98"` | Panel top-right, normalized `[0, 1]`. |
+| `PreviewRequiresPermission` | `false` | Gate `/mncdpreview` on the permission node. |
+| `PreviewCooldownSeconds` | `15.0` | Per-player cooldown. Clamped to `[5, 300]`. |
+| `PreviewRingDuration` | `30.0` | Seconds the ring stays visible. Clamped to `[1, 300]`. |
+| `PreviewRingRadiusMultiplier` | `1.0` | Visual-only multiplier. Clamped to `[0.1, 10]`. |
+
+Out-of-range, malformed, or hand-edited values are clamped or reset on load
+and the corrected file is rewritten to disk.
 
 ---
 
-## Language files
+## Localization
 
-```
-oxide/lang/en/ModernNoCupboardDecay.json      (English)
-oxide/lang/es/ModernNoCupboardDecay.json      (Spanish)
-oxide/lang/ru/ModernNoCupboardDecay.json      (Russian)
-oxide/lang/zh-CN/ModernNoCupboardDecay.json   (Simplified Chinese)
-oxide/lang/la/ModernNoCupboardDecay.json      (Latin)
-```
+Per-locale files live under `oxide/lang/<locale>/ModernNoCupboardDecay.json`:
+
+`en`, `es`, `ru`, `zh-CN`, `la` (English, Spanish, Russian, Simplified Chinese, Latin).
+
+Adding a locale: copy `en/ModernNoCupboardDecay.json`, translate the values,
+and drop it under the appropriate folder. See `CONTRIBUTING.md`.
 
 ---
 
-## Testing procedure
+## Smoke test
 
 1. Place a TC and authorize yourself.
-2. Build within its radius.
-3. Trigger decay (admin hurt tool).
-4. Run `/mncddebug` and walk in and out of the TC radius.
-5. Run `/mncdpreview` to visualize the bubble.
-6. Adjust UI live with `/mncduiadd 0 -0.05`.
+2. Build a wall or deployable inside the radius.
+3. `/mncddebug` &mdash; confirm the banner flips to **MNCD: Protected**.
+4. `/mncdpreview` &mdash; confirm the ring shows the protection bubble.
+5. Open the TC &mdash; the wipe-timer panel should appear.
+6. `/mncduiadd 0 -0.05` &mdash; the panel slides down on the next TC open.
 
 ---
 
-## Support / issues
+## Support
 
-https://github.com/gjdunga/ModernNoCupboardDecay
+Issues and feature requests: <https://github.com/gjdunga/ModernNoCupboardDecay>

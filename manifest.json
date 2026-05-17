@@ -1,9 +1,10 @@
 {
   "name": "ModernNoCupboardDecay",
   "title": "Modern No Cupboard Decay",
-  "version": "5.3.2",
-  "author": "Gabriel",
-  "description": "Prevents decay within Tool Cupboard radius. Wipe-aware UI, team-aware auth, debug tools, TC preview holograms, multilingual support (en, es, ru, zh-CN, la). Oxide v2.0.7022+ / Naval Update compatible. Verified through Oxide 2.0.7182 (Community Update 268).",
+  "version": "5.3.3",
+  "author": "Gabriel Dungan",
+  "vendor": "DunganSoft Technologies",
+  "description": "Prevents decay within Tool Cupboard radius. Wipe-aware UI, team-aware auth, debug tools, TC preview holograms, multilingual support (en, es, ru, zh-CN, la). Oxide v2.0.7022+ / Naval Update compatible. Verified against Oxide 2.0.7338 (May 2026).",
   "language": "C#",
   "game": "rust",
   "modloader": "oxide",
@@ -35,6 +36,6 @@
   ],
   "compatibility": {
     "oxide_minimum": "2.0.7022",
-    "oxide_verified": "2.0.7182"
+    "oxide_verified": "2.0.7338"
   }
 }

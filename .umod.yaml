@@ -1,7 +1,8 @@
 name: ModernNoCupboardDecay
 title: Modern No Cupboard Decay
-version: 5.3.2
-author: Gabriel
+version: 5.3.3
+author: Gabriel Dungan
+vendor: DunganSoft Technologies
 game: rust
 modloader: oxide
 branch: stable
@@ -12,8 +13,8 @@ description: >
   positioning, live runtime configuration, TC preview holograms, protection
   debugging overlay, multi-language support (en, es, ru, zh-CN, la), and
   automated wipe-schedule detection (weekly / biweekly / monthly / custom N-day).
-  Requires Oxide 2.0.7022+. Verified compatible through Oxide 2.0.7182
-  (Rust Community Update 268).
+  Requires Oxide 2.0.7022+. Verified compatible against Oxide 2.0.7338
+  (May 2026 Rust patch series).
 
 language: C#
 category: building

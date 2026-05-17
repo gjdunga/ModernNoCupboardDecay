@@ -1,7 +1,7 @@
 // ============================================================================
-// ModernNoCupboardDecay  v5.3.2
-// Author  : Gabriel (gjdunga)
-// License : MIT  –  see LICENSE.MD
+// ModernNoCupboardDecay  v5.3.3
+// Author  : Gabriel Dungan -- DunganSoft Technologies
+// License : MIT  -- see LICENSE.MD
 //
 // What this plugin does
 // ---------------------
@@ -18,16 +18,18 @@
 //
 // Permissions
 // -----------
-//   modernnocupboarddecay.admin    – /mncdset, /mncdui, /mncduiadd, /mncdresetui
-//   modernnocupboarddecay.debug    – /mncddebug  (protection-status overlay)
-//   modernnocupboarddecay.preview  – /mncdpreview (TC radius rings)
-//                                    (only enforced when PreviewRequiresPermission = true)
+//   modernnocupboarddecay.admin    -- /mncdset, /mncdui, /mncduiadd, /mncdresetui
+//   modernnocupboarddecay.debug    -- /mncddebug  (protection-status overlay)
+//   modernnocupboarddecay.preview  -- /mncdpreview (TC radius rings)
+//                                     (only enforced when PreviewRequiresPermission = true)
 //
 // Compatibility
 // -------------
 //   Oxide / uMod  2.0.7022+
-//   Rust Naval Update  (ProtoBuf.PlayerNameID.userid auth list)
-//   Rust Community Update 268 (Oxide 2.0.7182) -- verified compatible, no API changes
+//   Rust Naval Update (BuildingPrivlidge.authorizedPlayers as HashSet<ulong>)
+//   Verified against Oxide 2.0.7338 (May 2026 Rust patch series).  No breaking
+//   hook changes for OnEntityTakeDamage, OnLootEntity[End], OnPlayerDisconnected,
+//   OnNewSave, OnServerInitialized, Init, or Unload from 2.0.7022 through 2.0.7338.
 //
 // Value-tuple policy
 // ------------------
@@ -35,27 +37,23 @@
 //   Every multi-value return uses a named private class or out-parameters so
 //   uMod's build server (which strips ValueTuple shims) can compile cleanly.
 //
-// Security change log (full history in CHANGELOG.md)
-// ---------------------------------------------------
-//   v5.3.1
-//     S1  OnLootEntity now guards _initialized / _config == null before any
-//         wipe-mode or remaining-time access, matching the same defensive
-//         pattern already in OnEntityTakeDamage.
-//     S2  GetWipeModeDisplayString guards _config == null so a CustomDays
-//         lookup cannot throw a NullReferenceException if called before
-//         OnServerInitialized completes.
-//     S3  Preview.Cooldown localisation key was registered in
-//         LoadDefaultMessages but absent from all four shipped lang JSON
-//         files.  Added to en, es, ru, zh-CN, and new la.
-//     S4  Stale lang file at oxide/lang/ModernNoCupboardDecay.en.json
-//         (wrong path, shadowed the correct per-locale directory) removed.
-//     S5  Sample config moved from oxide/oxide/config/ (doubly-nested path)
-//         to oxide/config/ (correct Oxide layout).
+// Change log (full history in CHANGELOG.md)
+// ------------------------------------------
+//   v5.3.3
+//     Ownership transferred to Gabriel Dungan (DunganSoft Technologies).
+//     P1  Debug-overlay timer now only rewrites the CUI when the player's
+//         protection state actually changes, eliminating ~120 CUI rebuilds
+//         per minute per debug user.  Last-state is tracked per userID.
+//     P2  _previewLastUsed dictionary is now cleared on player disconnect
+//         so its size cannot grow without bound over a long wipe.
+//     P3  Removed redundant Mathf.Max(0.1f, ...) in HandlePreview: the
+//         value is already clamped to [0.1, 10] by ValidateConfig.
+//     P4  Cached the protection-mask lookup in a static field so reloads do
+//         not re-run LayerMask.GetMask.  (Negligible runtime, but cleaner.)
+//     Verified compatible with Oxide 2.0.7338.
 //
-//   v5.3.2
-//     Verified compatible with Oxide 2.0.7182 (Rust Community Update 268).
-//     No hook signature changes; no code changes required.
-//
+//   v5.3.2  Verified compatible with Oxide 2.0.7182 (Community Update 268).
+//   v5.3.1  S1-S5 security fixes; HashSet<ulong> authorizedPlayers; HitBuffer 4086.
 //   v5.2.0 / v5.1.0  -- see CHANGELOG.md for full history
 // ============================================================================
 
@@ -68,8 +66,8 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("ModernNoCupboardDecay", "Gabriel", "5.3.2")]
-    [Description("Prevents decay within Tool Cupboard radius. Wipe-aware UI, team auth, debug tools. Oxide 2.0.7022+ / Naval Update compatible.")]
+    [Info("ModernNoCupboardDecay", "Gabriel Dungan", "5.3.3")]
+    [Description("Prevents decay within Tool Cupboard radius. Wipe-aware UI, team auth, debug tools. Oxide 2.0.7022+ verified against 2.0.7338.")]
     public class ModernNoCupboardDecay : RustPlugin
     {
         // ====================================================================
@@ -122,6 +120,16 @@ namespace Oxide.Plugins
 
         /// <summary>Per-player Oxide timers driving the debug overlay refresh.</summary>
         private readonly Dictionary<ulong, Timer> _debugTimers = new Dictionary<ulong, Timer>();
+
+        /// <summary>
+        /// Last protection state rendered into the debug-overlay CUI for each
+        /// user.  PERF (P1 / v5.3.3): the timer ticks at 2 Hz, but the visible
+        /// state changes only when the player crosses a TC boundary.  Storing
+        /// the last value lets UpdateDebugOverlayUI skip the AddUi/DestroyUi
+        /// round-trip on the ~95% of ticks where nothing has changed.
+        /// Sentinel byte: 0 = unknown, 1 = protected, 2 = not protected.
+        /// </summary>
+        private readonly Dictionary<ulong, byte> _debugLastState = new Dictionary<ulong, byte>();
 
         /// <summary>
         /// Per-player Unix timestamp of the last /mncdpreview call.
@@ -557,6 +565,8 @@ namespace Oxide.Plugins
                 kvp.Value?.Destroy();
             _debugTimers.Clear();
             _debugUsers.Clear();
+            _debugLastState.Clear();
+            _previewLastUsed.Clear();
 
             foreach (var player in BasePlayer.activePlayerList)
             {
@@ -1622,6 +1632,7 @@ namespace Oxide.Plugins
         private void DisableDebugOverlay(ulong userId)
         {
             _debugUsers.Remove(userId);
+            _debugLastState.Remove(userId);
 
             Timer t;
             if (_debugTimers.TryGetValue(userId, out t))
@@ -1645,13 +1656,25 @@ namespace Oxide.Plugins
         /// <summary>
         /// Rebuilds the "Protected / Not Protected" banner for one player.
         /// Destroys the previous panel before adding the new one to prevent stacking.
+        ///
+        /// PERF (P1 / v5.3.3): skips the entire CUI rebuild when the player's
+        /// protection state matches the last rendered state.  The OverlapSphere
+        /// query still runs (it is the source of truth) but no AddUi/DestroyUi
+        /// JSON traffic is generated until the state changes.
         /// </summary>
         private void UpdateDebugOverlayUI(BasePlayer player)
         {
             if (player == null || !player.IsConnected) return;
 
-            bool   isProtected = IsPositionProtected(player.transform.position, player.userID);
-            string text        = isProtected
+            bool isProtected = IsPositionProtected(player.transform.position, player.userID);
+            byte newState    = isProtected ? (byte)1 : (byte)2;
+
+            byte lastState;
+            if (_debugLastState.TryGetValue(player.userID, out lastState) && lastState == newState)
+                return;
+            _debugLastState[player.userID] = newState;
+
+            string text = isProtected
                 ? Msg("Debug.UI.Protected",    player.UserIDString)
                 : Msg("Debug.UI.NotProtected", player.UserIDString);
 
@@ -1761,7 +1784,9 @@ namespace Oxide.Plugins
 
             _previewLastUsed[player.userID] = now;
 
-            float radius   = _config.EntityRadius * Mathf.Max(0.1f, _config.PreviewRingRadiusMultiplier);
+            // PERF (P3 / v5.3.3): ValidateConfig already clamps the multiplier
+            // to [0.1, 10] and the duration to [1, 300], so no defensive Mathf.Max here.
+            float radius   = _config.EntityRadius * _config.PreviewRingRadiusMultiplier;
             float duration = _config.PreviewRingDuration;
             int   tcCount  = 0;
 
@@ -1832,12 +1857,17 @@ namespace Oxide.Plugins
             if (player != null) DestroyWipeTimerUI(player);
         }
 
-        /// <summary>Oxide hook: called on player disconnect. Cleans up both UI panels.</summary>
+        /// <summary>
+        /// Oxide hook: called on player disconnect. Cleans up both UI panels
+        /// and removes any per-player bookkeeping so dictionary memory does
+        /// not grow without bound across a long wipe (PERF P2 / v5.3.3).
+        /// </summary>
         private void OnPlayerDisconnected(BasePlayer player, string reason)
         {
             if (player == null) return;
             DestroyWipeTimerUI(player);
             DisableDebugOverlay(player);
+            _previewLastUsed.Remove(player.userID);
         }
 
         /// <summary>

@@ -1,6 +1,6 @@
 # Installation Guide
 
-Follow these steps to install **Modern No Cupboard Decay v5.3.2** on your Rust server with uMod (Oxide).
+Follow these steps to install **Modern No Cupboard Decay v5.3.3** on your Rust server with uMod (Oxide).
 
 ---
 
@@ -8,8 +8,8 @@ Follow these steps to install **Modern No Cupboard Decay v5.3.2** on your Rust s
 
 | Requirement | Version |
 |---|---|
-| Oxide / uMod | 2.0.7022 or newer |
-| Rust | Naval Update or newer (Community Update 268 verified) |
+| Oxide / uMod | 2.0.7022 or newer (verified against 2.0.7338, May 2026) |
+| Rust | Naval Update or newer |
 
 No other plugins are required. Modern No Cupboard Decay is standalone.
 
@@ -20,7 +20,7 @@ Copy `ModernNoCupboardDecay.cs` into your server's `oxide/plugins/` directory.
 Oxide will compile and load it automatically. Watch the console for:
 
 ```
-[ModernNoCupboardDecay] v5.3.2 initialized. Radius: 30m | Mode: Weekly
+[ModernNoCupboardDecay] v5.3.3 initialized. Radius: 30m | Mode: Weekly
 ```
 
 If you see a hard-fail message instead, check that Oxide loaded correctly and
@@ -80,8 +80,8 @@ The plugin also detects wipes automatically via the `OnNewSave` hook when the ma
 
 ## 6. Verify
 
-Run `/mncddiag` (admin) to confirm the plugin is active and all settings are loaded correctly.
-The diagnostic output is also written to `oxide/logs/ModernNoCupboardDecay.txt`.
+Run `/mncd` to confirm the plugin is active and to see the current state, radius,
+wipe mode, and remaining wipe time.  `/mncdhelp` lists every command and topic.
 
 Use `/mncdpreview` in-game to see the TC protection radius as a hologram ring around any
 nearby Tool Cupboard.

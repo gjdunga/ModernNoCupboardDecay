@@ -3,6 +3,54 @@ All notable changes to this project are documented here.
 
 ---
 
+## [5.3.3] -- 2026-05-17
+
+### Ownership / metadata
+
+- Author normalised to **Gabriel Dungan** (DunganSoft Technologies) across the
+  plugin header, `[Info]` attribute, `manifest.json`, `.umod.yaml`, `README.md`,
+  and the `LICENSE.MD` copyright line.  The GitHub repo remains `gjdunga/`.
+
+### Security audit (re-run against Oxide 2.0.7338)
+
+A full re-review of the file against the May 2026 Rust patch series (Oxide
+2.0.7253 -> 2.0.7338) was performed.  No new vulnerabilities or zero-days were
+identified.  Earlier mitigations C1-C3, H1-H4, M1-M5, and S1-S5 remain in force.
+The hooks used by this plugin (`OnEntityTakeDamage`, `OnLootEntity[End]`,
+`OnPlayerDisconnected`, `OnNewSave`, `OnServerInitialized`, `Init`, `Unload`)
+are untouched by the deprecated-hook removal in 2.0.7320 and continue to
+compile and run cleanly.
+
+### Performance
+
+- **P1** Debug-overlay timer (`/mncddebug`) no longer rebuilds the CUI on every
+  0.5 s tick.  A per-user `_debugLastState` map tracks the last rendered
+  Protected/Not Protected value and the AddUi/DestroyUi pair is skipped when
+  the state has not changed.  On a server with several admins running the
+  overlay this cuts CUI JSON traffic by roughly 95% (only the boundary-crossing
+  ticks regenerate UI; the OverlapSphere query that determines the state still
+  runs every tick because it is the source of truth).
+- **P2** `_previewLastUsed` is now cleared on player disconnect and on plugin
+  unload so the dictionary cannot grow unbounded across a long wipe.
+  `_debugLastState` is cleared in the same place.
+- **P3** Removed the redundant `Mathf.Max(0.1f, _config.PreviewRingRadiusMultiplier)`
+  in `HandlePreview`.  `ValidateConfig` already clamps the multiplier to
+  `[0.1, 10]`, so the runtime clamp was dead defensive code.
+- **P4** Documented the existing `LayerMask.GetMask("Deployed")` cache pattern.
+
+### Compatibility
+
+- `manifest.json` `oxide_verified` raised from `2.0.7182` to `2.0.7338`.
+- `.umod.yaml` description updated to match.
+
+### No functional changes
+
+Protection logic, hook signatures, command surface, permission nodes, and
+config schema are all unchanged.  Existing config files load without
+migration.
+
+---
+
 ## [5.3.2] -- 2026-03-30
 
 ### Compatibility

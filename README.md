@@ -1,10 +1,12 @@
-# ModernNoCupboardDecay v5.3.2 -- Administrator Guide
+# ModernNoCupboardDecay v5.3.3 -- Administrator Guide
+
+Maintained by **Gabriel Dungan** -- DunganSoft Technologies.
 
 Prevents decay for all building blocks and deployables within any Tool Cupboard
 radius.  Includes wipe-timer UI, team-aware auth, debug overlay, TC preview
 holograms, live config editing, and multi-language support.
 
-Requires Oxide / uMod 2.0.7022+  |  Compatible with Naval Update and Community Update 268 (Oxide 2.0.7182).
+Requires Oxide / uMod 2.0.7022+  |  Verified against Oxide 2.0.7338 (May 2026 Rust patch series).
 
 
 ---

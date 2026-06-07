@@ -15,8 +15,6 @@
   "Usage.MncdSet.Console": "[MNCD] Использование: mncd.set <опция> <значение>. Опции: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow.",
   "Usage.UIAdd.Chat": "[MNCD] Использование: /mncduiadd <deltaX> <deltaY> (смещения 0..1).",
   "Usage.UIAdd.Console": "[MNCD] Использование: mncd.uiadd <deltaX> <deltaY> (смещения 0..1).",
-  "Usage.UIReset.Chat": "[MNCD] Использование: /mncdresetui (сброс позиции панели UI по умолчанию).",
-  "Usage.UIReset.Console": "[MNCD] Использование: mncd.resetui (сброс позиции панели UI по умолчанию).",
   "Config.CheckAuth.Set": "[MNCD] CheckAuth теперь {0}.",
   "Config.TeamAware.Set": "[MNCD] TeamAwareProtection теперь {0}.",
   "Config.Radius.Set": "[MNCD] EntityRadius (зона защиты от гниения у TC) теперь {0} м.",

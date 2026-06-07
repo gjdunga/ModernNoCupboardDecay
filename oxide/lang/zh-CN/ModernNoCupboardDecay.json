@@ -15,8 +15,6 @@
   "Usage.MncdSet.Console": "[MNCD] 用法: mncd.set <选项> <值>。选项: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow。",
   "Usage.UIAdd.Chat": "[MNCD] 用法: /mncduiadd <deltaX> <deltaY> (0..1 的偏移量)。",
   "Usage.UIAdd.Console": "[MNCD] 用法: mncd.uiadd <deltaX> <deltaY> (0..1 的偏移量)。",
-  "Usage.UIReset.Chat": "[MNCD] 用法: /mncdresetui (重置 UI 面板到默认位置)。",
-  "Usage.UIReset.Console": "[MNCD] 用法: mncd.resetui (重置 UI 面板到默认位置)。",
   "Config.CheckAuth.Set": "[MNCD] CheckAuth 现在为 {0}。",
   "Config.TeamAware.Set": "[MNCD] TeamAwareProtection 现在为 {0}。",
   "Config.Radius.Set": "[MNCD] EntityRadius (TC 防腐蚀范围) 现在为 {0} 米。",

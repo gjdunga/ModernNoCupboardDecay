@@ -1,6 +1,5 @@
 {
   "Status.Report": "[{0}] v{1} | Status: {2} | Radius: {3} | CheckAuth: {4} | TeamAware: {5} | AutoDetect: {6} | WipeMode: {7} (Override: {8}) | Tempus Reliquum: {9} | Notitia: {10}",
-
   "Error.NoPermission": "[MNCD] Tibi permissio mutandi rationes deest.",
   "Error.NoDebugPermission": "[MNCD] Tibi permissio utendi tabulae inspectionis deest.",
   "Error.ConfigOption": "[MNCD] Optio ignota. Optiones validae: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow.",
@@ -11,16 +10,11 @@
   "Error.RadiusValue": "[MNCD] radius numerum positivum metrorum postulat.",
   "Error.WipeModeValue": "[MNCD] wipemode unum ex his esse debet: Manual, Weekly, BiWeekly, Monthly, aut numerus dierum ut 5d.",
   "Error.BoolExpected": "[MNCD] {0} verum vel falsum postulat.",
-
   "Preview.Cooldown": "[MNCD] Expecta {0} secundas antequam /mncdpreview iterum utaris.",
-
   "Usage.MncdSet.Chat": "[MNCD] Usus: /mncdset <optio> <valor>. Optiones: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow.",
   "Usage.MncdSet.Console": "[MNCD] Usus: mncd.set <optio> <valor>. Optiones: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow.",
   "Usage.UIAdd.Chat": "[MNCD] Usus: /mncduiadd <deltaX> <deltaY> (motus normalizati 0..1).",
   "Usage.UIAdd.Console": "[MNCD] Usus: mncd.uiadd <deltaX> <deltaY> (motus normalizati 0..1).",
-  "Usage.UIReset.Chat": "[MNCD] Usus: /mncdresetui (positionem tabulae ad primam formam reducit).",
-  "Usage.UIReset.Console": "[MNCD] Usus: mncd.resetui (positionem tabulae ad primam formam reducit).",
-
   "Config.CheckAuth.Set": "[MNCD] CheckAuth nunc est {0}.",
   "Config.TeamAware.Set": "[MNCD] TeamAwareProtection nunc est {0}.",
   "Config.Radius.Set": "[MNCD] EntityRadius (zona TC a corruptione defensa) nunc est {0} metra.",
@@ -29,44 +23,30 @@
   "Config.WipeStartNow.Set": "[MNCD] WipeStartUnixTime nunc positum est. WipeMode: {0}. Tempus reliquum: {1}.",
   "Config.UIReset.Set": "[MNCD] Ancorae tabulae ad pristinum statum reductae sunt. Aperi TC iterum ut novam positionem videas.",
   "Config.UIAdd.Set": "[MNCD] Ancorae tabulae motae sunt ({0}, {1}). Novum Min({2}, {3}) Max({4}, {5}).",
-
   "TcLoot.NoRemaining": "[MNCD] Radius huius TC plene a corruptione per ModernNoCupboardDecay defenditur.\nOrdo delendi: {0}. Finis deleendi non calculatus (manualis aut data desunt).",
   "TcLoot.WithRemaining": "[MNCD] Radius huius TC plene a corruptione per ModernNoCupboardDecay defenditur.\nOrdo delendi: {0}. Deletio in: {1}.",
-
   "UI.WipeTitle": "ModernNoCupboardDecay",
   "UI.WipeLine": "Deletio: {0} - {1} reliquum",
   "UI.WipeExtra": "Corruptio intra radium huius Armarii Instrumentorum prohibita est.",
-
   "UIAnchor.Usage.Chat": "[MNCD] Usus: /mncdui <minX> <minY> <maxX> <maxY>",
   "UIAnchor.Usage.Console": "[MNCD] Usus: mncd.ui <minX> <minY> <maxX> <maxY>",
   "UIAnchor.Set": "[MNCD] Ancorae tabulae positae: Min({0}, {1})  Max({2}, {3})",
   "UIAnchor.Error.Numeric": "[MNCD] Omnes 4 valores numerici esse debent.",
   "UIAnchor.Error.Order": "[MNCD] minX < maxX et minY < maxY necessarium est.",
-
   "Debug.Enabled": "[MNCD] Tabula inspectionis activata est. Ostendit te in zona defensionis MNCD esse necne.",
   "Debug.Disabled": "[MNCD] Tabula inspectionis desactivata est.",
   "Debug.UI.Protected": "MNCD: Defensum",
   "Debug.UI.NotProtected": "MNCD: Non Defensum",
-
   "Preview.NoTC": "[MNCD] Nulla Armaria Instrumentorum inventa sunt. Nihil praevidendum.",
   "Preview.Drawn": "[MNCD] Circuli defensionis TC pro {0} armariis per {1} secundas (radius {2} metra) delineantur.",
   "Preview.NoPerm": "[MNCD] Tibi permissio utendi /mncdpreview deest.",
-
   "Help.Header": "[MNCD] ModernNoCupboardDecay v{0}",
-
   "Help.General": "ModernNoCupboardDecay corruptionem entium intra radium Armarii Instrumentorum prohibet et informationes de deletione ostendit.\nMandatorum summa:\n  /mncd               - Statum plugins ostende.\n  /mncdhelp [thema]   - Auxilium. Themata: basic, ui, set, debug, preview, wipe.\n  /mncdpreview        - Circulos defensionis TC delinea.\n  /mncddebug          - Tabulam personalem status defensionis accende/extingue.\nMandatorum administratoris:\n  /mncdset            - Configurationem in tempore reali muta.\n  /mncdui, /mncduiadd - Tabulam UI deletionis move.\n  /mncdresetui        - Positionem tabulae ad statum primum reduc.\nUte '/mncdhelp <thema>' pro detaliis. Exemplum: /mncdhelp preview",
-
   "Help.UnknownTopic": "[MNCD] Thema auxilii ignotum '{0}'. Themata valida: basic, ui, set, debug, preview, wipe.",
-
   "Help.Topic.basic": "Fundamenta MNCD:\n- Omnia entia intra radium configuratum Armarii Instrumentorum a corruptione defenduntur.\n- CheckAuth facultativus: solum entia a iure auctorizato in TC possessa (aut eorum cohortis) defenduntur.\n- TeamAwareProtection: si activatum, socii cohorti possessoris TC quoque proteguntur.\n- Tempus sustentationis TC in 'tempus ad deletionem' in MNCD UI mutatur.\nMandatorum utilia:\n  /mncd           - Radium currentem, modum deletionis et statum ostende.\n  /mncddebug      - Vide utrum intra bullam defensam sis.",
-
   "Help.Topic.ui": "Positio tabulae UI:\n  /mncdui <minX> <minY> <maxX> <maxY>\n    - Ancoram tabulae UI deletionis TC ponit in coordinatis normalizatis (0..1).\n    - Exemplum: /mncdui 0.70 0.27 0.95 0.49\n  /mncduiadd <dx> <dy>\n    - Tabulam UI paulum movet.\n    - Exemplum: /mncduiadd -0.02 0.10 eam 2% sinistrorsum et 10% sursum movet.\n  /mncdresetui\n    - Tabulam UI ad positionem primam summo medio reducit.\nNotae:\n  - Administratorem aut permissionem 'modernnocupboarddecay.admin' postulat.\n  - Post mutationem UI, TC iterum aperi ut tabulam renovatam videas.",
-
   "Help.Topic.set": "Configuratio in tempore reali: /mncdset et mncd.set\n\nColloquio (administrator):\n  /mncdset <optio> <valor>\nConsolae/RCON:\n  mncd.set <optio> <valor>\n\nOptiones:\n  checkauth <verum|falsum>\n    - verum  => solum entia a iure auctorizato in TC possessa (et cohortibus facultativis) proteguntur.\n    - falsum => quidquid prope TC est protegetur.\n  teamaware <verum|falsum>\n    - Si checkauth verum est, etiam socii cohorti possessoris/auctorizati proteguntur.\n  radius <metra>\n    - Radium defensionis TC ponit. Exemplum: /mncdset radius 30\n  autodetect <verum|falsum>\n    - verum  => modum deletionis ex server.tags detegit (weekly, monthly, 5d, etc.).\n    - falsum => WipeModeOverride utitur.\n  wipemode <Manual|Weekly|BiWeekly|Monthly|Nd>\n    - Exemplum: /mncdset wipemode 5d (pro deletionibus singulis 5 diebus).\n  wipestartnow\n    - Initium deletionis ad nunc ponit. Utile si ordinem muta durante deletione.",
-
   "Help.Topic.debug": "Tabula inspectionis: /mncddebug et mncd.debug\n\n  /mncddebug\n    - Tabulam parvam textus ad summitatem scaenae accendit/exstinguit:\n      'MNCD: Defensum'     => intra radium defensum TC es.\n      'MNCD: Non Defensum' => extra defensionem MNCD es.\n  mncd.debug (consolae)\n    - Idem ac /mncddebug, sed ex consolae F1 pro illo lusore.\n\nNotae:\n  - Administratorem aut permissionem 'modernnocupboarddecay.debug' postulat.\n  - Qualibet 0.5 secundis renovatur.\n  - Automatice desistit et mundat cum lusor discedit.",
-
   "Help.Topic.preview": "Circuli praevisualizationis TC: /mncdpreview et mncd.preview\n\n  /mncdpreview\n    - Sphaeras 'holographicas' circa omnia Armaria Instrumentorum delineat.\n    - EntityRadius configuratum utitur (facultative per PreviewRingRadiusMultiplier multiplicatum).\n    - Solum tu circulos vides; clientis ddraw sunt.\n\n  mncd.preview (consolae)\n    - Idem effectus, ex consolae F1 invocatus.\n\nConfiguratio:\n  PreviewRequiresPermission\n    - falsum (praedefinitum) => omnes lusores /mncdpreview uti possunt.\n    - verum               => permissionem 'modernnocupboarddecay.preview' aut administratorem postulat.\n  PreviewRingDuration\n    - Quandiu circuli visibiles sunt (secundae).\n  PreviewRingRadiusMultiplier\n    - Solum radium visionis multiplicat, non defensionem actualem.",
-
   "Help.Topic.wipe": "Modi deletionis et mensurator:\n\nDetectio:\n  - AutoDetectWipeFromTags = verum:\n    - ConVar.Server.tags legit quaerens: weekly, biweekly, monthly.\n    - Etiam exemplaria ut '5d', '5day', '5days' pro deletionibus personalibus N dierum sustinet.\n  - AutoDetectWipeFromTags = falsum:\n    - WipeModeOverride ex configuratione aut /mncdset wipemode utitur.\n\nModi sustentati:\n  Manual      => nullum tempus finis automaticum.\n  Weekly      => deletiones singulis 7 diebus.\n  BiWeekly    => singulis 14 diebus.\n  Monthly     => fixo mensura 30 dierum.\n  Nd (Custom) => ut '5d' => singulis 5 diebus.\n\nInitium deletionis:\n  - OnNewSave (nova tabula/deletio) WipeStartUnixTime automatice ponit.\n  - /mncdset wipestartnow initium manualiter reponi potest.\n\nTC UI:\n  - Cum TC aperis, MNCD ostendit 'Deletio: <modus> - <tempus reliquum>'.\n  - Si modus Manual est aut computari non potest, N/A ostenditur."
 }

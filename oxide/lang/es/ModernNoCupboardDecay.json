@@ -15,8 +15,6 @@
   "Usage.MncdSet.Console": "[MNCD] Uso: mncd.set <opción> <valor>. Opciones: checkauth, teamaware, radius, autodetect, wipemode, wipestartnow.",
   "Usage.UIAdd.Chat": "[MNCD] Uso: /mncduiadd <deltaX> <deltaY> (desplazamientos normalizados 0..1).",
   "Usage.UIAdd.Console": "[MNCD] Uso: mncd.uiadd <deltaX> <deltaY> (desplazamientos normalizados 0..1).",
-  "Usage.UIReset.Chat": "[MNCD] Uso: /mncdresetui (restablece la posición por defecto del panel UI).",
-  "Usage.UIReset.Console": "[MNCD] Uso: mncd.resetui (restablece la posición por defecto del panel UI).",
   "Config.CheckAuth.Set": "[MNCD] CheckAuth ahora es {0}.",
   "Config.TeamAware.Set": "[MNCD] TeamAwareProtection ahora es {0}.",
   "Config.Radius.Set": "[MNCD] EntityRadius (burbuja de decaimiento del TC) ahora es {0} metros.",

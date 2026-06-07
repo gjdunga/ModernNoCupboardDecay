@@ -1,5 +1,5 @@
 // ============================================================================
-// ModernNoCupboardDecay  v5.3.4
+// ModernNoCupboardDecay  v5.3.5
 // Author  : Gabriel Dungan -- DunganSoft Technologies
 // License : MIT  -- see LICENSE.MD
 //
@@ -39,7 +39,7 @@
 //
 // Change log (full history in CHANGELOG.md)
 // ------------------------------------------
-//   v5.3.4
+//   v5.3.5
 //     [Info] author set to uMod username "gjdunga" (approval requirement).
 //     COMPILE-FIX  Built Different retyped ConsoleSystem.Arg.Args to
 //                  Facepunch.StringView[]; console commands now materialise
@@ -73,7 +73,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("ModernNoCupboardDecay", "gjdunga", "5.3.4")]
+    [Info("ModernNoCupboardDecay", "gjdunga", "5.3.5")]
     [Description("Prevents decay within Tool Cupboard radius. Wipe-aware UI, team auth, debug tools. Oxide 2.0.7022+ verified against 2.0.7338.")]
     public class ModernNoCupboardDecay : RustPlugin
     {

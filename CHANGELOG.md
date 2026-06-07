@@ -3,7 +3,7 @@ All notable changes to this project are documented here.
 
 ---
 
-## [5.3.4] -- 2026-06-06
+## [5.3.5] -- 2026-06-06
 
 ### Fixed (API compatibility -- Oxide 2.0.7423 / Built Different)
 - `ConsoleSystem.Arg.Args` changed from `string[]` to `Facepunch.StringView[]` in

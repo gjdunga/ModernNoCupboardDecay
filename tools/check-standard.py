@@ -39,7 +39,7 @@ DEFAULTS = {
 
 REQUIRED_FILES = [
     "README.md", "INSTALL.md", "CHANGELOG.md", "CONTRIBUTING.md",
-    "SECURITY.md", "BUILD.md", "LICENSE", ".editorconfig",
+    "SECURITY.md", "BUILD.md", "LICENSE", "CLAUDE.md", ".editorconfig",
     ".gitattributes", ".gitignore", "manifest.json", ".umod.yaml",
 ]
 MANIFEST_REQUIRED = [
@@ -103,6 +103,16 @@ def main(repo):
     icon = os.path.exists(os.path.join(repo, "icon.png"))
     if not icon:
         (err if cfg["icon_required"] else warn)("icon.png missing (uMod/marketplace listing icon)")
+
+    # --- CLAUDE.md content (points AI agents at the standard) ----------
+    claude_path = os.path.join(repo, "CLAUDE.md")
+    if os.path.exists(claude_path):
+        ctext = open(claude_path, encoding="utf-8", errors="replace").read()
+        leftover = re.findall(r'__[A-Z][A-Z0-9_]*__', ctext)
+        if leftover:
+            err(f"CLAUDE.md has unresolved template placeholder(s): {sorted(set(leftover))}")
+        if "gjdunga/rust-plugin-standard" not in ctext:
+            err("CLAUDE.md must reference the standard (gjdunga/rust-plugin-standard)")
 
     # --- [Info] / [Description] / class -------------------------------
     m = re.search(r'\[Info\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*,\s*"([0-9]+\.[0-9]+\.[0-9]+)"\s*\)\]', src)

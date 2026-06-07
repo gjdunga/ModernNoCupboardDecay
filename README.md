@@ -1,18 +1,18 @@
 # ModernNoCupboardDecay
 
-**v5.3.7** &middot; Oxide / uMod plugin for Rust &middot; MIT license
+**v5.3.8** &middot; Oxide / uMod plugin for Rust &middot; GPL-3.0 license
 
 Maintained by **Gabriel Dungan** &mdash; DunganSoft Technologies.
 
 Stops decay on every building block and deployable inside a Tool Cupboard's
 protection radius. Ships with a wipe-timer panel, team-aware authorization,
 admin debug overlay, TC preview holograms, live config editing, and translations
-for English, Spanish, Russian, Simplified Chinese, and Latin.
+for English, Spanish, Russian, Latin, Simplified Chinese, German, French, and Portuguese.
 
 | | |
 |---|---|
 | Requires | Oxide / uMod **2.0.7022+** |
-| Verified | Oxide **2.0.7338** (May 2026 Rust patch series) |
+| Verified | Oxide **2.0.7423** (Built Different, 2026-06) |
 | Install | [`INSTALL.md`](./INSTALL.md) |
 | Changes | [`CHANGELOG.md`](./CHANGELOG.md) |
 | Contribute | [`CONTRIBUTING.md`](./CONTRIBUTING.md) |
@@ -96,7 +96,7 @@ and the corrected file is rewritten to disk.
 
 Per-locale files live under `oxide/lang/<locale>/ModernNoCupboardDecay.json`:
 
-`en`, `es`, `ru`, `zh-CN`, `la` (English, Spanish, Russian, Simplified Chinese, Latin).
+`en`, `es`, `ru`, `la`, `zh-CN`, `de`, `fr`, `pt` (English, Spanish, Russian, Latin, Simplified Chinese, German, French, Portuguese).
 
 Adding a locale: copy `en/ModernNoCupboardDecay.json`, translate the values,
 and drop it under the appropriate folder. See `CONTRIBUTING.md`.

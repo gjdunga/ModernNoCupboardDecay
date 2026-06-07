@@ -3,6 +3,19 @@ All notable changes to this project are documented here.
 
 ---
 
+## [5.3.8] -- 2026-06-07
+
+### Changed
+- **License changed from MIT to GPL-3.0.** `LICENSE`, `manifest.json`, `.umod.yaml`,
+  and the source header now reference the GNU General Public License v3.0. Versions
+  up to 5.3.7 remain available under MIT (not retroactive); this and future versions
+  are GPL-3.0.
+
+### Docs
+- README corrected: verified Oxide build (2.0.7423) and the full eight-locale list.
+
+No code, config, or hook changes.
+
 ## [5.3.7] -- 2026-06-07
 
 ### Changed (DunganSoft Plugin Standard)

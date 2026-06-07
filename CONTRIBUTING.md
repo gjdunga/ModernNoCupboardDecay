@@ -36,7 +36,7 @@ oxide/lang/<locale>/ModernNoCupboardDecay.json
 manifest.json                            uMod metadata
 .umod.yaml                               uMod package descriptor
 README.md / INSTALL.md / CHANGELOG.md
-LICENSE.MD                               MIT
+LICENSE                               MIT
 ```
 
 Keep versions aligned across `[Info(...)]`, `manifest.json`, `.umod.yaml`,
@@ -155,6 +155,6 @@ the GitHub repo rather than a public issue.
 
 ## License
 
-Contributions are accepted under the MIT terms in
-[`LICENSE.MD`](./LICENSE.MD). By opening a pull request you confirm you
+Contributions are accepted under the GPL-3.0 terms in
+[`LICENSE`](./LICENSE). By opening a pull request you confirm you
 have the right to license your contribution under those terms.

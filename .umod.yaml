@@ -1,6 +1,6 @@
 name: ModernNoCupboardDecay
 title: Modern No Cupboard Decay
-version: 5.3.7
+version: 5.3.8
 author: Gabriel Dungan (DunganSoft Technologies)
 author_handle: gjdunga
 description: >-
@@ -9,7 +9,7 @@ description: >-
   verified against Oxide 2.0.7423.
 game: rust
 language: C#
-license: MIT
+license: GPL-3.0
 tags:
   - building
   - cupboard

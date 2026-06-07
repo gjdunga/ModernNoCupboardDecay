@@ -1,11 +1,11 @@
 {
   "name": "ModernNoCupboardDecay",
   "title": "Modern No Cupboard Decay",
-  "version": "5.3.7",
+  "version": "5.3.8",
   "author": "Gabriel Dungan (DunganSoft Technologies)",
   "author_handle": "gjdunga",
   "description": "Prevents decay within Tool Cupboard radius. Wipe-aware UI, team-aware auth, debug overlay, and TC preview holograms. Oxide v2.0.7022+ (Rust Naval Update); verified against Oxide 2.0.7423.",
-  "license": "MIT",
+  "license": "GPL-3.0",
   "game": "rust",
   "language": "csharp",
   "tags": [

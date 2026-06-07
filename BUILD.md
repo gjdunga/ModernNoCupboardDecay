@@ -7,8 +7,9 @@ You do not need to build anything to deploy it — copy the `.cs` file and reloa
 This document describes the optional **compile-validation chain**: a way to
 type-check the plugin against the *real* Oxide, Rust and Unity assemblies on your
 own machine (or in CI) so API breaks are caught before they reach a live server.
-The Built Different `ConsoleSystem.Arg.Args` → `StringView` retype (fixed in 4.2.1)
-is exactly the class of break this chain catches at build time.
+For example, Facepunch's periodic Rust API changes — such as the "Built Different"
+update retyping `ConsoleSystem.Arg.Args` from `string[]` to `Facepunch.StringView[]`
+— are exactly the class of break this chain catches at build time.
 
 > The DLL produced by this build is a throwaway. The shipped artifact is always
 > the raw `.cs` file. This project exists only to make the compiler tell you

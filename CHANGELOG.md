@@ -3,6 +3,17 @@ All notable changes to this project are documented here.
 
 ---
 
+## [5.3.6] -- 2026-06-06
+
+### Localization
+- Added German (`de`), French (`fr`) and Portuguese (`pt`) translations. The plugin
+  now ships all eight locales: `en`, `es`, `ru`, `la`, `zh-CN`, `de`, `fr`, `pt`.
+  All `{0}`–`{10}` placeholders, `/mncd*` command literals, config field names, wipe
+  mode enums, and permission nodes are preserved in every locale.
+- Removed two orphan lang keys (`Usage.UIReset.Chat`, `Usage.UIReset.Console`) that
+  the plugin never registered or used, from every locale. Lang files now mirror the
+  registered message set exactly. No code, config, or hook changes.
+
 ## [5.3.5] -- 2026-06-06
 
 ### Fixed (API compatibility -- Oxide 2.0.7423 / Built Different)

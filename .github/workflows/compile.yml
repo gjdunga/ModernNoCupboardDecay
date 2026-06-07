@@ -1,0 +1,75 @@
+name: Compile
+
+# Type-checks oxide/plugins/ModernNoCupboardDecay.cs against the *real* Oxide, Rust
+# and Unity assemblies on every push / PR that touches the plugin or the build
+# chain. Catches API breaks (like the Built Different StringView retype) here
+# instead of in oxide.log on a live server.
+#
+# Reference assemblies come from a Rust dedicated server + Oxide install (see
+# tools/fetch-references.sh). They are cached on a weekly key so the build
+# re-validates against the latest Rust/Oxide once a week without re-downloading
+# the multi-GB server on every run.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'oxide/plugins/**'
+      - 'build/**'
+      - 'tools/**'
+      - '.github/workflows/compile.yml'
+  pull_request:
+    paths:
+      - 'oxide/plugins/**'
+      - 'build/**'
+      - 'tools/**'
+      - '.github/workflows/compile.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    name: Type-check against Oxide/Rust assemblies
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Compute weekly cache key
+        id: key
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Oxide/Rust reference assemblies
+        id: refs-cache
+        uses: actions/cache@v4
+        with:
+          path: references/RustDedicated_Data/Managed
+          key: rust-managed-${{ runner.os }}-${{ steps.key.outputs.week }}
+
+      - name: Install SteamCMD prerequisites
+        if: steps.refs-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lib32gcc-s1 ca-certificates
+
+      - name: Fetch reference assemblies
+        if: steps.refs-cache.outputs.cache-hit != 'true'
+        run: |
+          chmod +x tools/fetch-references.sh
+          tools/fetch-references.sh --managed-only
+
+      - name: Compile plugin
+        run: dotnet build build/ModernNoCupboardDecay.csproj -c Release --nologo

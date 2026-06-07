@@ -1,4 +1,4 @@
-# Installation &mdash; ModernNoCupboardDecay v5.3.3
+# Installation &mdash; ModernNoCupboardDecay v5.3.4
 
 A 5-minute install. Full command and config reference is in
 [`README.md`](./README.md).
@@ -20,7 +20,7 @@ The server console should print a startup summary similar to:
 
 ```
 [ModernNoCupboardDecay] Startup summary:
-  Version: 5.3.3
+  Version: 5.3.4
   CheckAuth: False  |  TeamAware: True
   EntityRadius: 30m
   AutoDetect: True  |  WipeMode: Weekly

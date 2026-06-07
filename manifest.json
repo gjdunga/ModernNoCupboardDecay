@@ -1,41 +1,53 @@
 {
   "name": "ModernNoCupboardDecay",
   "title": "Modern No Cupboard Decay",
-  "version": "5.3.6",
-  "author": "Gabriel Dungan",
-  "vendor": "DunganSoft Technologies",
-  "description": "Prevents decay within Tool Cupboard radius. Wipe-aware UI, team-aware auth, debug tools, TC preview holograms, multilingual support (en, es, ru, zh-CN, la). Oxide v2.0.7022+ / Naval Update compatible. Verified against Oxide 2.0.7338 (May 2026).",
-  "language": "C#",
-  "game": "rust",
-  "modloader": "oxide",
-  "branch": "stable",
-  "category": "building",
+  "version": "5.3.7",
+  "author": "Gabriel Dungan (DunganSoft Technologies)",
+  "author_handle": "gjdunga",
+  "description": "Prevents decay within Tool Cupboard radius. Wipe-aware UI, team-aware auth, debug overlay, and TC preview holograms. Oxide v2.0.7022+ (Rust Naval Update); verified against Oxide 2.0.7423.",
   "license": "MIT",
-  "website": "https://github.com/gjdunga/ModernNoCupboardDecay",
-  "source": "https://github.com/gjdunga/ModernNoCupboardDecay",
-  "documentation": "https://github.com/gjdunga/ModernNoCupboardDecay#readme",
+  "game": "rust",
+  "language": "csharp",
   "tags": [
-    "rust",
-    "oxide",
-    "umod",
+    "building",
     "cupboard",
     "decay",
-    "team",
-    "debug",
     "wipe",
-    "hologram",
     "ui",
-    "qol"
+    "quality-of-life"
   ],
-  "languages": [
-    "en",
-    "es",
-    "ru",
-    "zh-CN",
-    "la"
+  "permissions": [
+    {
+      "name": "modernnocupboarddecay.admin",
+      "description": "Use /mncdset, /mncdui, /mncduiadd and /mncdresetui to change settings and move the wipe UI."
+    },
+    {
+      "name": "modernnocupboarddecay.debug",
+      "description": "Use /mncddebug to toggle the personal protection-status overlay."
+    },
+    {
+      "name": "modernnocupboarddecay.preview",
+      "description": "Use /mncdpreview to draw TC protection rings (enforced only when PreviewRequiresPermission is true)."
+    }
+  ],
+  "commands": [
+    { "command": "mncd", "arguments": "", "description": "Show plugin status." },
+    { "command": "mncdhelp", "arguments": "[topic]", "description": "Show help (topics: basic, ui, set, debug, preview, wipe)." },
+    { "command": "mncdpreview", "arguments": "", "description": "Draw TC protection rings (hologram, client-side)." },
+    { "command": "mncddebug", "arguments": "", "description": "Toggle your personal protection-status overlay." },
+    { "command": "mncdset", "arguments": "<option> <value>", "description": "Admin: live configuration (radius, auth, wipe mode)." },
+    { "command": "mncdui", "arguments": "<minX> <minY> <maxX> <maxY>", "description": "Admin: set the wipe-UI panel anchors." },
+    { "command": "mncduiadd", "arguments": "<dx> <dy>", "description": "Admin: nudge the wipe-UI panel." },
+    { "command": "mncdresetui", "arguments": "", "description": "Admin: reset the wipe-UI position." }
   ],
   "compatibility": {
     "oxide_minimum": "2.0.7022",
-    "oxide_verified": "2.0.7338"
+    "oxide_verified": "2.0.7423"
+  },
+  "links": {
+    "source": "https://github.com/gjdunga/ModernNoCupboardDecay",
+    "documentation": "https://github.com/gjdunga/ModernNoCupboardDecay#readme",
+    "issues": "https://github.com/gjdunga/ModernNoCupboardDecay/issues",
+    "website": "https://github.com/gjdunga/ModernNoCupboardDecay"
   }
 }

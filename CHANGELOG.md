@@ -3,6 +3,16 @@ All notable changes to this project are documented here.
 
 ---
 
+## [5.3.7] -- 2026-06-07
+
+### Changed (DunganSoft Plugin Standard)
+- Adopted the shared [DunganSoft Plugin Standard](https://github.com/gjdunga/rust-plugin-standard):
+  unified `manifest.json` + `.umod.yaml` to the canonical schema (`author_handle`,
+  structured `permissions`/`commands`/`links`), renamed `LICENSE.MD` to `LICENSE`,
+  added `SECURITY.md`, `.editorconfig`, `.gitattributes`, vendored
+  `tools/check-standard.py`, and added `standards.yml` + a canonical
+  `draft-release-on-tag.yml` (replaces manual releases). No code, config, or hook changes.
+
 ## [5.3.6] -- 2026-06-06
 
 ### Localization

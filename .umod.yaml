@@ -1,44 +1,19 @@
 name: ModernNoCupboardDecay
 title: Modern No Cupboard Decay
-version: 5.3.6
-author: Gabriel Dungan
-vendor: DunganSoft Technologies
+version: 5.3.7
+author: Gabriel Dungan (DunganSoft Technologies)
+author_handle: gjdunga
+description: >-
+  Prevents decay within Tool Cupboard radius. Wipe-aware UI, team-aware auth,
+  debug overlay, and TC preview holograms. Oxide v2.0.7022+ (Rust Naval Update);
+  verified against Oxide 2.0.7423.
 game: rust
-modloader: oxide
-branch: stable
-
-description: >
-  Prevents decay for anything within Tool Cupboard radius. Supports TC auth
-  and team-aware protection logic, provides a wipe-aware TC UI, draggable UI
-  positioning, live runtime configuration, TC preview holograms, protection
-  debugging overlay, multi-language support (en, es, ru, zh-CN, la), and
-  automated wipe-schedule detection (weekly / biweekly / monthly / custom N-day).
-  Requires Oxide 2.0.7022+. Verified compatible against Oxide 2.0.7338
-  (May 2026 Rust patch series).
-
 language: C#
-category: building
 license: MIT
-
-website: https://github.com/gjdunga/ModernNoCupboardDecay
-source: https://github.com/gjdunga/ModernNoCupboardDecay
-documentation: https://github.com/gjdunga/ModernNoCupboardDecay#readme
-
 tags:
-  - rust
-  - oxide
-  - umod
+  - building
   - cupboard
   - decay
-  - building
-  - debug
   - wipe
-  - qol
-
-permissions:
-  - name: modernnocupboarddecay.admin
-    description: Allows access to all configuration and UI commands.
-  - name: modernnocupboarddecay.debug
-    description: Allows use of the protection-status debug overlay.
-  - name: modernnocupboarddecay.preview
-    description: Allows use of /mncdpreview when PreviewRequiresPermission is true.
+  - ui
+  - quality-of-life

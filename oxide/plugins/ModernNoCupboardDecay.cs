@@ -1,5 +1,5 @@
 // ============================================================================
-// ModernNoCupboardDecay  v5.3.6
+// ModernNoCupboardDecay  v5.3.7
 // Author  : Gabriel Dungan -- DunganSoft Technologies
 // License : MIT  -- see LICENSE.MD
 //
@@ -39,6 +39,11 @@
 //
 // Change log (full history in CHANGELOG.md)
 // ------------------------------------------
+//   v5.3.7
+//     Adopted the DunganSoft Plugin Standard: canonical manifest/.umod schema,
+//     LICENSE rename, SECURITY/.editorconfig/.gitattributes, vendored conformance
+//     checker + standards CI, canonical release workflow. No code changes.
+//
 //   v5.3.6
 //     Localization: added de/fr/pt translations (now 8 locales: en, es, ru, la,
 //                   zh-CN, de, fr, pt). Removed 2 orphan Usage.UIReset.* lang keys.
@@ -77,7 +82,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("ModernNoCupboardDecay", "gjdunga", "5.3.6")]
+    [Info("ModernNoCupboardDecay", "gjdunga", "5.3.7")]
     [Description("Prevents decay within Tool Cupboard radius. Wipe-aware UI, team auth, debug tools. Oxide 2.0.7022+ verified against 2.0.7338.")]
     public class ModernNoCupboardDecay : RustPlugin
     {

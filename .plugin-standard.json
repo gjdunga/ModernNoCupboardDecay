@@ -1,0 +1,7 @@
+{
+  "umod": true,
+  "author_handle": "gjdunga",
+  "locales": ["en", "es", "ru", "la", "zh-CN", "de", "fr", "pt"],
+  "config_required": true,
+  "icon_required": false
+}

@@ -3,6 +3,25 @@ All notable changes to this project are documented here.
 
 ---
 
+## [5.3.4] -- 2026-06-06
+
+### Fixed (API compatibility -- Oxide 2.0.7423 / Built Different)
+- `ConsoleSystem.Arg.Args` changed from `string[]` to `Facepunch.StringView[]` in
+  the Facepunch "Built Different" Rust update, breaking compilation of the `mncd.*`
+  console commands. Console handlers now materialise arguments to a plain `string[]`
+  via a `ToStringArgs` helper (and call `.ToString()` on individual `arg.Args[i]`
+  reads). The conversion is source-compatible with the older `string[]` typing.
+
+### Changed (uMod submission prep)
+- `[Info]` author set to the uMod username `gjdunga`. Display credit (Gabriel Dungan,
+  DunganSoft Technologies) is retained in the source header, README, and manifest.
+
+### Build / tooling
+- Added an out-of-server compile-validation chain (`build/ModernNoCupboardDecay.csproj`,
+  `tools/fetch-references.{sh,ps1}`, `.github/workflows/compile.yml`, `Makefile`,
+  `BUILD.md`) that type-checks the plugin against the real Oxide/Rust/Unity assemblies
+  on every push / PR. No gameplay, config, or hook changes.
+
 ## [5.3.3] -- 2026-05-17
 
 ### Ownership / metadata

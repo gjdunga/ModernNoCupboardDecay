@@ -1,5 +1,5 @@
 // ============================================================================
-// ModernNoCupboardDecay  v5.3.3
+// ModernNoCupboardDecay  v5.3.4
 // Author  : Gabriel Dungan -- DunganSoft Technologies
 // License : MIT  -- see LICENSE.MD
 //
@@ -39,6 +39,13 @@
 //
 // Change log (full history in CHANGELOG.md)
 // ------------------------------------------
+//   v5.3.4
+//     [Info] author set to uMod username "gjdunga" (approval requirement).
+//     COMPILE-FIX  Built Different retyped ConsoleSystem.Arg.Args to
+//                  Facepunch.StringView[]; console commands now materialise
+//                  arguments to string[] (ToStringArgs helper / .ToString()).
+//     Added out-of-server compile-validation chain (build/, tools/, CI).
+//
 //   v5.3.3
 //     Ownership transferred to Gabriel Dungan (DunganSoft Technologies).
 //     P1  Debug-overlay timer now only rewrites the CUI when the player's
@@ -66,7 +73,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("ModernNoCupboardDecay", "Gabriel Dungan", "5.3.3")]
+    [Info("ModernNoCupboardDecay", "gjdunga", "5.3.4")]
     [Description("Prevents decay within Tool Cupboard radius. Wipe-aware UI, team auth, debug tools. Oxide 2.0.7022+ verified against 2.0.7338.")]
     public class ModernNoCupboardDecay : RustPlugin
     {
@@ -1127,7 +1134,7 @@ namespace Oxide.Plugins
         {
             var player = arg?.Player();
             string topic = (arg?.Args != null && arg.Args.Length > 0)
-                ? arg.Args[0].ToLowerInvariant()
+                ? arg.Args[0].ToString().ToLowerInvariant()
                 : "general";
             Reply(player, arg, BuildHelpText(topic, player?.UserIDString));
         }
@@ -1208,8 +1215,8 @@ namespace Oxide.Plugins
                 return;
             }
 
-            string option = arg.Args[0];
-            string value  = arg.Args.Length > 1 ? arg.Args[1] : null;
+            string option = arg.Args[0].ToString();
+            string value  = arg.Args.Length > 1 ? arg.Args[1].ToString() : null;
 
             if (player == null)
                 Puts($"[MNCD] RCON/console config change: mncd.set {option} {value ?? "(no value)"}");
@@ -1362,7 +1369,25 @@ namespace Oxide.Plugins
                 SendReply(player, Msg("Error.NoPermission", player.UserIDString));
                 return;
             }
-            HandleUiAnchorChange(player, arg, arg?.Args);
+            HandleUiAnchorChange(player, arg, ToStringArgs(arg));
+        }
+
+        /// <summary>
+        /// Materialises a console command's arguments to a plain string[].
+        /// Facepunch's "Built Different" update retyped ConsoleSystem.Arg.Args from
+        /// string[] to Facepunch.StringView[]; this single boundary conversion lets
+        /// the rest of the plugin keep operating on string[]. Returns null when there
+        /// are no arguments so existing null/empty-guard branches stay reachable.
+        /// StringView.ToString() and string.ToString() are both identity, so this is
+        /// source-compatible with the pre-Built-Different string[] typing.
+        /// </summary>
+        private static string[] ToStringArgs(ConsoleSystem.Arg arg)
+        {
+            var raw = arg?.Args;
+            if (raw == null || raw.Length == 0) return null;
+            var result = new string[raw.Length];
+            for (int i = 0; i < raw.Length; i++) result[i] = raw[i].ToString();
+            return result;
         }
 
         /// <summary>Shared implementation for chat and console UI anchor set commands.</summary>
@@ -1420,7 +1445,7 @@ namespace Oxide.Plugins
                 SendReply(player, Msg("Error.NoPermission", player.UserIDString));
                 return;
             }
-            HandleUiAddOffset(player, arg, arg?.Args);
+            HandleUiAddOffset(player, arg, ToStringArgs(arg));
         }
 
         /// <summary>Shared implementation for the UI nudge command.</summary>

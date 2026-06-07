@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    ModernNoCupboardDecay — out-of-server compile validation.
+    Type-checks oxide/plugins/ModernNoCupboardDecay.cs against the real
+    Oxide/Rust/Unity assemblies. The shipped artifact is the raw .cs. See BUILD.md.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <OutputType>Library</OutputType>
+    <AssemblyName>ModernNoCupboardDecay</AssemblyName>
+    <RootNamespace>Oxide.Plugins</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <Deterministic>true</Deterministic>
+    <Optimize>false</Optimize>
+    <NoWarn>$(NoWarn);1701;1702;1685</NoWarn>
+    <ManagedDir Condition="'$(ManagedDir)' == '' and '$(RUST_MANAGED)' != ''">$(RUST_MANAGED)</ManagedDir>
+    <ManagedDir Condition="'$(ManagedDir)' == ''">$(MSBuildThisFileDirectory)../references/RustDedicated_Data/Managed</ManagedDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)../oxide/plugins/ModernNoCupboardDecay.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="$(ManagedDir)/*.dll">
+      <HintPath>%(Identity)</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Remove="$(ManagedDir)/mscorlib.dll" />
+    <Reference Remove="$(ManagedDir)/System.dll" />
+    <Reference Remove="$(ManagedDir)/System.*.dll" />
+    <Reference Remove="$(ManagedDir)/netstandard.dll" />
+    <Reference Remove="$(ManagedDir)/Mono.*.dll" />
+    <Reference Remove="$(ManagedDir)/Microsoft.*.dll" />
+    <!-- Avoid Newtonsoft.Json vs Oxide.References JsonProperty collision (CS0433). -->
+    <Reference Remove="$(ManagedDir)/Oxide.References.dll" />
+  </ItemGroup>
+
+  <Target Name="EnsureManagedDir" BeforeTargets="ResolveAssemblyReferences;BeforeCompile">
+    <Error Condition="!Exists('$(ManagedDir)')"
+           Text="Reference assemblies not found at '$(ManagedDir)'. Run tools/fetch-references.sh or set -p:ManagedDir=... / RUST_MANAGED. See BUILD.md." />
+  </Target>
+
+</Project>

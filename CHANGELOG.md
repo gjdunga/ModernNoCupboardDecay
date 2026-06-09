@@ -3,6 +3,15 @@ All notable changes to this project are documented here.
 
 ---
 
+## [6.0.0] - 2026-06-09
+
+### Changed
+- Version aligned to a whole-number release (5.3.8 -> 6.0.0). No functional changes.
+
+### Security
+- Release is code-signed: a detached OpenPGP signature (`ModernNoCupboardDecay.cs.asc`) and the public
+  key (`gjdunga.asc`) are attached and verifiable.
+
 ## [5.3.8] -- 2026-06-07
 
 ### Changed

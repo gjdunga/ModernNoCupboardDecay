@@ -86,7 +86,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("ModernNoCupboardDecay", "gjdunga", "5.3.8")]
+    [Info("ModernNoCupboardDecay", "gjdunga", "6.0.0")]
     [Description("Prevents decay within Tool Cupboard radius. Wipe-aware UI, team auth, debug tools. Oxide 2.0.7022+ verified against 2.0.7338.")]
     public class ModernNoCupboardDecay : RustPlugin
     {

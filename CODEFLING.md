@@ -42,6 +42,17 @@ Prevents decay within Tool Cupboard radius. Wipe-aware UI, team-aware auth, debu
 2. Upload it to `oxide/plugins/ModernNoCupboardDecay.cs` on your server.
 3. The plugin compiles and loads automatically; a default config is written to `oxide/config/ModernNoCupboardDecay.json` on first load.
 
+## Verifying the download
+
+This plugin is **code-signed**. Every release attaches a detached OpenPGP signature (`ModernNoCupboardDecay.cs.asc`) and the public key (`gjdunga.asc`):
+
+```bash
+gpg --import gjdunga.asc   # fingerprint EAC0A2AE65CC6C9762DD6AF06877843761D5C6E6
+gpg --verify ModernNoCupboardDecay.cs.asc ModernNoCupboardDecay.cs
+```
+
+Expect: `Good signature from "Gabriel Dungan <gjdunga@gmail.com>"`.
+
 ## What's new in 5.3.8
 
 ### Changed

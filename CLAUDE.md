@@ -22,7 +22,7 @@ wolf-paw listing icon, and the Codefling listing generator:
 - **License:** GPL-3.0 (free; uMod-eligible). Per-repo config lives in
   `.plugin-standard.json` (`umod` true/false). Paid plugins use the DunganSoft EULA
   + a private repo (see the standard); these stay free/GPL.
-- **Listings:** regenerate `CODEFLING.md` via the standard's `tools/make-listing.py`
+- **Listings:** regenerate `CODEFLING.md` via the vendored `tools/make-listing.py`
   on each release.
 - **Release:** tag `vX.Y.Z` → the release workflow drafts a GitHub release; publish it
   and confirm it is marked **Latest**.

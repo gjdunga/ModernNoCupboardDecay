@@ -21,7 +21,7 @@ Per-repo configuration lives in `.plugin-standard.json` at the repo root:
 
 Only the Python standard library plus PyYAML are required.
 """
-import sys, os, re, json, glob
+import sys, os, re, json, glob, shutil, subprocess, tempfile
 
 try:
     import yaml
@@ -35,6 +35,7 @@ DEFAULTS = {
     "locales": ["en", "es", "ru", "la", "zh-CN", "de", "fr", "pt"],
     "config_required": True,
     "icon_required": False,
+    "signed": False,
 }
 
 REQUIRED_FILES = [
@@ -216,6 +217,29 @@ def main(repo):
                 if extra: err(f"locale {loc}: orphan keys {sorted(extra)[:6]}")
                 bad = [k for k in (enk & set(d)) if placeholders(str(d[k])) != placeholders(str(en[k]))]
                 if bad: err(f"locale {loc}: placeholder mismatch in {bad[:4]}")
+
+    # --- code signing (optional; gated on .plugin-standard.json "signed": true) ---
+    if cfg.get("signed"):
+        sig = cs_path + ".asc"
+        keys = sorted(glob.glob(os.path.join(repo, "keys", "*.asc")))
+        gpg = shutil.which("gpg")
+        if not os.path.exists(sig):
+            err(f"signed=true but signature missing: oxide/plugins/{plugin}.cs.asc (run tools/sign-plugin.sh)")
+        elif not keys:
+            err("signed=true but no public key under keys/*.asc to verify against")
+        elif gpg is None:
+            warn("signed=true but gpg is not installed; skipping signature verification")
+        else:
+            with tempfile.TemporaryDirectory() as gh:
+                env = dict(os.environ, GNUPGHOME=gh)
+                for k in keys:
+                    subprocess.run([gpg, "--batch", "--quiet", "--import", k], env=env,
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                r = subprocess.run([gpg, "--batch", "--verify", sig, cs_path], env=env,
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if r.returncode != 0:
+                    err(f"signature verification failed: oxide/plugins/{plugin}.cs.asc is not a valid "
+                        f"signature from a key in keys/ (re-run tools/sign-plugin.sh after editing the .cs)")
 
     return finish()
 

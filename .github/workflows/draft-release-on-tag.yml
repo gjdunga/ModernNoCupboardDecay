@@ -18,6 +18,9 @@ jobs:
         run: |
           mkdir -p release-assets
           cp "oxide/plugins/ModernNoCupboardDecay.cs" release-assets/
+          # Detached signature + public key (DunganSoft Plugin Standard §11), when present.
+          [ -f "oxide/plugins/ModernNoCupboardDecay.cs.asc" ] && cp "oxide/plugins/ModernNoCupboardDecay.cs.asc" release-assets/ || true
+          [ -f "keys/gjdunga.asc" ] && cp "keys/gjdunga.asc" release-assets/ || true
           for dir in oxide/lang/*/; do
             loc="$(basename "$dir")"
             src="${dir}ModernNoCupboardDecay.json"
@@ -32,4 +35,6 @@ jobs:
           generate_release_notes: true
           files: |
             release-assets/ModernNoCupboardDecay.cs
+            release-assets/ModernNoCupboardDecay.cs.asc
+            release-assets/gjdunga.asc
             release-assets/ModernNoCupboardDecay-*.json

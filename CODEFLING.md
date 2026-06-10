@@ -5,7 +5,7 @@
 > the screenshots and confirm the price before publishing. Regenerate on each release.
 
 - **Title:** Modern No Cupboard Decay
-- **Version:** 5.3.8
+- **Version:** 6.0.0
 - **Price:** Free
 - **Tags:** building, cupboard, decay, wipe, ui, quality-of-life
 - **Compatibility:** Oxide **2.0.7022+** (verified 2.0.7423)
@@ -53,18 +53,14 @@ gpg --verify ModernNoCupboardDecay.cs.asc ModernNoCupboardDecay.cs
 
 Expect: `Good signature from "Gabriel Dungan <gjdunga@gmail.com>"`.
 
-## What's new in 5.3.8
+## What's new in 6.0.0
 
 ### Changed
-- **License changed from MIT to GPL-3.0.** `LICENSE`, `manifest.json`, `.umod.yaml`,
-  and the source header now reference the GNU General Public License v3.0. Versions
-  up to 5.3.7 remain available under MIT (not retroactive); this and future versions
-  are GPL-3.0.
+- Version aligned to a whole-number release (5.3.8 -> 6.0.0). No functional changes.
 
-### Docs
-- README corrected: verified Oxide build (2.0.7423) and the full eight-locale list.
-
-No code, config, or hook changes.
+### Security
+- Release is code-signed: a detached OpenPGP signature (`ModernNoCupboardDecay.cs.asc`) and the public
+  key (`gjdunga.asc`) are attached and verifiable.
 
 ## Links
 

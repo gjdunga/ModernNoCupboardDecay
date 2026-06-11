@@ -1,6 +1,6 @@
 # ModernNoCupboardDecay
 
-**v5.3.8** &middot; Oxide / uMod plugin for Rust &middot; GPL-3.0 license
+**v6.0.1** &middot; Oxide / uMod plugin for Rust &middot; GPL-3.0 license
 
 Maintained by **Gabriel Dungan** &mdash; DunganSoft Technologies.
 

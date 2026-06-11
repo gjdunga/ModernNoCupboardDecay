@@ -5,7 +5,7 @@
 > the screenshots and confirm the price before publishing. Regenerate on each release.
 
 - **Title:** Modern No Cupboard Decay
-- **Version:** 6.0.0
+- **Version:** 6.0.1
 - **Price:** Free
 - **Tags:** building, cupboard, decay, wipe, ui, quality-of-life
 - **Compatibility:** Oxide **2.0.7022+** (verified 2.0.7423)
@@ -53,14 +53,10 @@ gpg --verify ModernNoCupboardDecay.cs.asc ModernNoCupboardDecay.cs
 
 Expect: `Good signature from "Gabriel Dungan <gjdunga@gmail.com>"`.
 
-## What's new in 6.0.0
+## What's new in 6.0.1
 
-### Changed
-- Version aligned to a whole-number release (5.3.8 -> 6.0.0). No functional changes.
-
-### Security
-- Release is code-signed: a detached OpenPGP signature (`ModernNoCupboardDecay.cs.asc`) and the public
-  key (`gjdunga.asc`) are attached and verifiable.
+### Fixed
+- In-file source header version banner corrected to match the `[Info]`/release version. No functional changes.
 
 ## Links
 

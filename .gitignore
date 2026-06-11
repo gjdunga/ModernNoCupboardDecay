@@ -21,3 +21,6 @@ build/obj/
 # OS
 .DS_Store
 Thumbs.db
+
+# local upload-staging artifacts (not shipped)
+dist/

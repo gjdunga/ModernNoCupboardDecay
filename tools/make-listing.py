@@ -52,17 +52,30 @@ if os.path.exists(rp):
     rt = open(rp, encoding="utf-8").read()
     m = re.search(r'(?im)^#{1,3}\s*Features\s*$(.*?)(?=^\s*#{1,3}\s|\Z)', rt, re.S | re.M)
     if m:
+        cur = None
         for line in m.group(1).splitlines():
             s = line.strip()
+            if not s:
+                continue
             if s.startswith(("- ", "* ")):
-                features.append(s[2:].strip())
+                # New bullet: flush the previous one, start collecting this one.
+                if cur is not None:
+                    features.append(cur)
+                cur = s[2:].strip()
+            elif cur is not None:
+                # Wrapped continuation of the current bullet — join it back on
+                # rather than dropping it (which truncated multi-line bullets).
+                cur += " " + s
             else:
+                # Bold-lead line with no bullet dash (alternate README style).
                 mm = re.match(r'^\*\*(.+?)\.?\*\*\s*[-—]?\s*(.*)$', s)
                 if mm:
                     feat = mm.group(1).strip()
                     if mm.group(2).strip():
                         feat += " — " + mm.group(2).strip()
-                    features.append(feat)
+                    cur = feat
+        if cur is not None:
+            features.append(cur)
 features = features[:10]
 
 # --- latest CHANGELOG entry body ---
